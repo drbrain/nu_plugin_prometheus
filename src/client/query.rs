@@ -1,23 +1,28 @@
-use nu_plugin::{EvaluatedCall, LabeledError};
+use nu_plugin::LabeledError;
 use nu_protocol::{record, Record, Span, Value};
 use prometheus_http_query::{
     response::{Data, InstantVector, RangeVector, Sample},
-    Client, Error,
+    Client,
 };
 
-pub struct Query {
+pub struct Query<'a> {
     client: Client,
-    query: String,
+    query: &'a Value,
 }
 
-impl Query {
-    pub fn new(client: Client, query: String) -> Self {
+impl<'a> Query<'a> {
+    pub fn new(client: Client, query: &'a Value) -> Self {
         Self { client, query }
     }
 
-    pub fn run(&self) -> Result<Value, Error> {
-        runtime().block_on(async {
-            let response = self.client.query(self.query.clone()).get().await?;
+    pub fn run(&self) -> Result<Value, LabeledError> {
+        runtime()?.block_on(async {
+            let response = self
+                .client
+                .query(self.query.as_string().unwrap())
+                .get()
+                .await
+                .map_err(|error| self.into_labeled_error(error))?;
 
             let value = match response.data() {
                 Data::Vector(v) => vector_to_value(v),
@@ -27,6 +32,47 @@ impl Query {
 
             Ok(value)
         })
+    }
+
+    fn into_labeled_error(&self, error: prometheus_http_query::Error) -> LabeledError {
+        match error {
+            prometheus_http_query::Error::Client(e) => LabeledError {
+                label: "Prometheus client error".to_string(),
+                msg: e.to_string(),
+                span: Some(self.query.span()),
+            },
+            prometheus_http_query::Error::ApiError(e) => LabeledError {
+                label: "Prometheus query error".to_string(),
+                msg: e.to_string(),
+                span: Some(self.query.span()),
+            },
+            prometheus_http_query::Error::EmptySeriesSelector => LabeledError {
+                label: "Empty series selector".to_string(),
+                msg: "".to_string(),
+                span: Some(self.query.span()),
+            },
+            // This error should be impossible to reach because it should occur when building the client
+            prometheus_http_query::Error::UrlParse(e) => LabeledError {
+                label: "Invalid URL".to_string(),
+                msg: e.to_string(),
+                span: None,
+            },
+            prometheus_http_query::Error::ResponseParse(e) => LabeledError {
+                label: "Prometheus response parse error".to_string(),
+                msg: e.to_string(),
+                span: None,
+            },
+            prometheus_http_query::Error::MissingField(e) => LabeledError {
+                label: "Prometheus missing response field error".to_string(),
+                msg: e.to_string(),
+                span: None,
+            },
+            e => LabeledError {
+                label: "Other prometheus query error".to_string(),
+                msg: e.to_string(),
+                span: Some(self.query.span()),
+            },
+        }
     }
 }
 
@@ -112,59 +158,13 @@ fn vector_to_value(vector: &[InstantVector]) -> Value {
     Value::list(records, Span::unknown())
 }
 
-pub fn into_labeled_error(
-    call: &EvaluatedCall,
-    input: &Value,
-    error: prometheus_http_query::Error,
-) -> LabeledError {
-    match error {
-        prometheus_http_query::Error::Client(e) => LabeledError {
-            label: "Prometheus client error".to_string(),
-            msg: e.to_string(),
-            span: Some(input.span()),
-        },
-        prometheus_http_query::Error::ApiError(e) => LabeledError {
-            label: "Prometheus query error".to_string(),
-            msg: e.to_string(),
-            span: Some(input.span()),
-        },
-        prometheus_http_query::Error::EmptySeriesSelector => LabeledError {
-            label: "Empty series selector".to_string(),
-            msg: "".to_string(),
-            span: Some(input.span()),
-        },
-        prometheus_http_query::Error::UrlParse(e) => {
-            let span = call
-                .get_flag_value("source")
-                .expect("required named argument source missing")
-                .span();
-            LabeledError {
-                label: "Invalid URL".to_string(),
-                msg: e.to_string(),
-                span: Some(span),
-            }
-        }
-        prometheus_http_query::Error::ResponseParse(e) => LabeledError {
-            label: "Prometheus response parse error".to_string(),
-            msg: e.to_string(),
-            span: None,
-        },
-        prometheus_http_query::Error::MissingField(e) => LabeledError {
-            label: "Prometheus missing response field error".to_string(),
-            msg: e.to_string(),
-            span: None,
-        },
-        e => LabeledError {
-            label: "Other prometheus query error".to_string(),
-            msg: e.to_string(),
-            span: Some(input.span()),
-        },
-    }
-}
-
-fn runtime() -> tokio::runtime::Runtime {
+fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .expect("Unable to create a tokio runtime")
+        .map_err(|e| LabeledError {
+            label: "Tokio runtime build error".into(),
+            msg: e.to_string(),
+            span: None,
+        })
 }

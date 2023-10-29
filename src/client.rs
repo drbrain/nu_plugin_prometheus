@@ -1,9 +1,12 @@
+mod query;
+
 use nu_plugin::{EvaluatedCall, LabeledError};
 use nu_protocol::Value;
 use prometheus_http_query::Client;
+pub use query::Query;
 use reqwest::{Certificate, Identity};
 
-pub fn build(call: &EvaluatedCall, source: &String) -> Result<Client, LabeledError> {
+pub fn build(call: &EvaluatedCall, source: Value) -> Result<Client, LabeledError> {
     let cert = call.get_flag_value("cert");
     let key = call.get_flag_value("key");
 
@@ -30,10 +33,10 @@ pub fn build(call: &EvaluatedCall, source: &String) -> Result<Client, LabeledErr
         span: None,
     })?;
 
-    let client = Client::from(client, &source).map_err(|e| LabeledError {
+    let client = Client::from(client, &source.as_string().unwrap()).map_err(|e| LabeledError {
         label: "Unable to build prometheus client".to_string(),
         msg: e.to_string(),
-        span: None,
+        span: Some(source.span()),
     })?;
 
     Ok(client)
