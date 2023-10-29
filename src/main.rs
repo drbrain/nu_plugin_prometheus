@@ -1,10 +1,12 @@
 mod client;
-mod plugin;
+mod prometheus;
 mod query;
+mod sub_command;
 
-use crate::plugin::Plugin;
+pub(crate) use crate::sub_command::SubCommand;
 use nu_plugin::{serve_plugin, JsonSerializer};
+use prometheus::Prometheus;
 
 fn main() {
-    serve_plugin(&mut Plugin::new(), JsonSerializer)
+    serve_plugin(&mut Prometheus::new(), JsonSerializer)
 }

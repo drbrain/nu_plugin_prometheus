@@ -1,19 +1,27 @@
-use crate::query::{into_labeled_error, Query};
+use crate::{
+    query::{into_labeled_error, Query},
+    SubCommand,
+};
 use nu_plugin::{EvaluatedCall, LabeledError};
 use nu_protocol::{PluginSignature, SyntaxShape, Type, Value};
 
-pub struct Plugin;
+#[derive(Clone)]
+pub struct QueryCommand;
 
-impl Plugin {
+impl QueryCommand {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl nu_plugin::Plugin for Plugin {
-    fn signature(&self) -> Vec<PluginSignature> {
-        vec![PluginSignature::build("prometheus")
-            .usage("Runs a prometheus query")
+impl SubCommand for QueryCommand {
+    fn name(&self) -> &str {
+        "prometheus query"
+    }
+
+    fn signature(&self) -> PluginSignature {
+        PluginSignature::build("prometheus query")
+            .usage(self.usage())
             .required_named(
                 "source",
                 SyntaxShape::String,
@@ -38,7 +46,11 @@ impl nu_plugin::Plugin for Plugin {
                 "Prometheus CA certificate",
                 Some('C'),
             )
-            .input_output_type(Type::String, Type::Any)]
+            .input_output_type(Type::String, Type::Any)
+    }
+
+    fn usage(&self) -> &str {
+        "Run a prometheus query"
     }
 
     fn run(
@@ -47,7 +59,7 @@ impl nu_plugin::Plugin for Plugin {
         call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        assert_eq!(name, "prometheus");
+        assert_eq!("prometheus query", name);
 
         let source = call
             .get_flag_value("source")
