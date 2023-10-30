@@ -1,6 +1,6 @@
 use nu_json::{Map, Value};
 use nu_plugin::{EvaluatedCall, LabeledError};
-use nu_protocol::Span;
+use nu_protocol::{record, Span};
 use prometheus_http_query::Client;
 use reqwest::{Certificate, Identity};
 use std::path::Path;
@@ -14,6 +14,37 @@ pub struct Source {
 }
 
 impl Source {
+    pub fn list() -> Result<nu_protocol::Value, LabeledError> {
+        let span = Span::unknown();
+        let sources = load_sources()?;
+
+        let mut list = vec![];
+        for (name, source) in sources.iter() {
+            let Value::Object(source) = source else {
+                return Err(LabeledError {
+                    label: "Unable to list source".into(),
+                    msg: format!("source {name:?} in configuration is not an object"),
+                    span: None,
+                });
+            };
+
+            let entry = nu_protocol::Value::record(
+                record!(
+                    "name" => nu_protocol::Value::string(name, span.clone()),
+                    "url" => get_field_value(source, "url"),
+                    "cert" => get_field_value(source, "cert"),
+                    "key" => get_field_value(source, "key"),
+                    "cacert" => get_field_value(source, "cacert"),
+                ),
+                span.clone(),
+            );
+
+            list.push(entry);
+        }
+
+        Ok(nu_protocol::Value::list(list, span.clone()))
+    }
+
     pub fn from_call(call: &EvaluatedCall) -> Result<Self, LabeledError> {
         let source = call.get_flag_value("source");
         let url = call.get_flag_value("url");
@@ -69,47 +100,12 @@ impl Source {
     fn from_config(source: nu_protocol::Value) -> Result<Self, LabeledError> {
         let name = source.as_string().unwrap();
 
-        let home = std::env::var("HOME").map_err(|e| LabeledError {
-            label: "Unable to find source".into(),
-            msg: format!("Could not find HOME env var: {e:?}"),
-            span: Some(source.span()),
-        })?;
-
-        let config_file = Path::new(&home).join(".config/nu_plugin_prometheus.hjson");
-
-        let config: Map<String, Value> = std::fs::read(&config_file)
-            .map(|config| nu_json::from_slice(&config[..]))
-            .map_err(|e| LabeledError {
-                label: "Unable to find source".into(),
-                msg: format!("Unable to read configuration file at {config_file:?}: {e:?}"),
-                span: Some(source.span()),
-            })?
-            .map_err(|e| LabeledError {
-                label: "Unable to find source".into(),
-                msg: format!("Unable to deserialize configuration file at {config_file:?}: {e:?}"),
-                span: Some(source.span()),
-            })?;
-
-        let Some(sources) = config.get("sources") else {
-            return Err(LabeledError {
-                label: "Unable to find source".into(),
-                msg: format!("Configuration file at {config_file:?} is missing a \"sources\" entry"),
-                span: Some(source.span()),
-            });
-        };
-
-        let Value::Object(sources) = sources else {
-            return Err(LabeledError {
-                label: "Unable to find source".into(),
-                msg: format!("\"sources\" entry in configuration file at {config_file:?} is not a object"),
-                span: Some(source.span()),
-            });
-        };
+        let sources = load_sources()?;
 
         let Some(chosen) = sources.get(&name) else {
             return Err(LabeledError {
                 label: "Unable to find source".into(),
-                msg: format!("source {name:?} in configuration file at {config_file:?} does not exist"),
+                msg: format!("source {name:?} in configuration does not exist"),
                 span: Some(source.span()),
             });
         };
@@ -117,7 +113,7 @@ impl Source {
         let Value::Object(chosen) = chosen else {
             return Err(LabeledError {
                 label: "Unable to find source".into(),
-                msg: format!("source {name:?} in configuration file at {config_file:?} is not an object"),
+                msg: format!("source {name:?} in configuration is not an object"),
                 span: Some(source.span()),
             });
         };
@@ -127,7 +123,7 @@ impl Source {
         let Some(url) = url else {
                 return Err(LabeledError {
                     label: "Unable to find source url".into(),
-                    msg: format!("source {name:?} in configuration file at {config_file:?} is missing its \"url\" field"),
+                    msg: format!("source {name:?} in configuration is missing its \"url\" field"),
                     span: Some(source.span()),
                 });
             };
@@ -214,11 +210,70 @@ fn certificate(cacert: nu_protocol::Value) -> Result<Certificate, LabeledError> 
 }
 
 fn get_field(chosen: &Map<String, Value>, field: &str) -> Option<String> {
-    let url = chosen
+    chosen
         .get(field)
-        .and_then(|url| url.as_str())
-        .map(|url| url.to_string());
-    url
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+}
+
+fn get_field_value(chosen: &Map<String, Value>, field: &str) -> nu_protocol::Value {
+    let span = Span::unknown();
+
+    get_field(chosen, field).map_or(nu_protocol::Value::nothing(span), |url| {
+        nu_protocol::Value::string(url, span)
+    })
+}
+
+fn identity(cert: nu_protocol::Value, key: nu_protocol::Value) -> Result<Identity, LabeledError> {
+    let cert_pem = read_pem(&cert, "Client certificate")?;
+    let key_pem = read_pem(&key, "Client key")?;
+
+    Identity::from_pkcs8_pem(&cert_pem, &key_pem).map_err(|e| LabeledError {
+        label: "Client certificate or key are not in PEM format".to_string(),
+        msg: e.to_string(),
+        span: None,
+    })
+}
+
+fn load_sources() -> Result<Map<String, nu_json::Value>, LabeledError> {
+    let home = std::env::var("HOME").map_err(|e| LabeledError {
+        label: "Unable to load sources".into(),
+        msg: format!("Could not find HOME env var: {e:?}"),
+        span: None,
+    })?;
+
+    let config_file = Path::new(&home).join(".config/nu_plugin_prometheus.hjson");
+
+    let config: Map<String, Value> = std::fs::read(&config_file)
+        .map(|config| nu_json::from_slice(&config[..]))
+        .map_err(|e| LabeledError {
+            label: "Unable to load sources".into(),
+            msg: format!("Unable to read configuration file at {config_file:?}: {e:?}"),
+            span: None,
+        })?
+        .map_err(|e| LabeledError {
+            label: "Unable to load sources".into(),
+            msg: format!("Unable to deserialize configuration file at {config_file:?}: {e:?}"),
+            span: None,
+        })?;
+
+    let Some(sources) = config.get("sources") else {
+        return Err(LabeledError {
+            label: "Unable to load sources".into(),
+            msg: format!("Configuration file at {config_file:?} is missing a \"sources\" entry"),
+            span: None,
+        });
+    };
+
+    let Value::Object(sources) = sources else {
+        return Err(LabeledError {
+            label: "Unable to load sources".into(),
+            msg: format!("\"sources\" entry in configuration file at {config_file:?} is not a object"),
+            span: None,
+        });
+    };
+
+    Ok(sources.clone())
 }
 
 fn make_identity(
@@ -235,17 +290,6 @@ fn make_identity(
             return Err(missing_flag("client cert", "--key", cert.span()));
         }
     }
-}
-
-fn identity(cert: nu_protocol::Value, key: nu_protocol::Value) -> Result<Identity, LabeledError> {
-    let cert_pem = read_pem(&cert, "Client certificate")?;
-    let key_pem = read_pem(&key, "Client key")?;
-
-    Identity::from_pkcs8_pem(&cert_pem, &key_pem).map_err(|e| LabeledError {
-        label: "Client certificate or key are not in PEM format".to_string(),
-        msg: e.to_string(),
-        span: None,
-    })
 }
 
 fn missing_flag(have: &str, missing: &str, span: Span) -> LabeledError {

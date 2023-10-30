@@ -2,14 +2,8 @@ use crate::{client::Query, source::Source, SubCommand};
 use nu_plugin::{EvaluatedCall, LabeledError};
 use nu_protocol::{PluginSignature, SyntaxShape, Type, Value};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct QueryCommand;
-
-impl QueryCommand {
-    pub fn new() -> Self {
-        Self
-    }
-}
 
 impl SubCommand for QueryCommand {
     fn name(&self) -> &str {
@@ -17,7 +11,7 @@ impl SubCommand for QueryCommand {
     }
 
     fn signature(&self) -> PluginSignature {
-        PluginSignature::build("prometheus query")
+        PluginSignature::build(self.name())
             .usage(self.usage())
             .named(
                 "source",

@@ -1,9 +1,12 @@
 mod query_command;
+mod sources_command;
 
+use crate::{
+    prometheus::{query_command::QueryCommand, sources_command::SourcesCommand},
+    SubCommand,
+};
 use nu_plugin::{LabeledError, Plugin};
 use nu_protocol::{Category, PluginSignature, Type, Value};
-
-use crate::{prometheus::query_command::QueryCommand, SubCommand};
 
 #[derive(Clone)]
 pub struct Prometheus;
@@ -27,7 +30,11 @@ impl Prometheus {
 
 impl Plugin for Prometheus {
     fn signature(&self) -> Vec<PluginSignature> {
-        vec![self.prometheus_signature(), QueryCommand::new().signature()]
+        vec![
+            self.prometheus_signature(),
+            QueryCommand::default().signature(),
+            SourcesCommand::default().signature(),
+        ]
     }
 
     fn run(
@@ -36,8 +43,9 @@ impl Plugin for Prometheus {
         call: &nu_plugin::EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        let mut command = match name {
-            "prometheus query" => QueryCommand::new(),
+        match name {
+            "prometheus query" => QueryCommand::default().run(name, call, input),
+            "prometheus sources" => SourcesCommand::default().run(name, call, input),
             "prometheus" => {
                 return Err(LabeledError {
                     label: "Missing subcommand".into(),
@@ -52,8 +60,6 @@ impl Plugin for Prometheus {
                     span: Some(call.head),
                 });
             }
-        };
-
-        command.run(name, call, input)
+        }
     }
 }
