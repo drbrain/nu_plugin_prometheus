@@ -305,6 +305,9 @@ name = "deranged"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2696e8a945f658fd14dc3b87242e6b80cd0f36ff04ea560fa39082368847946"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "dirs-next"
@@ -1212,14 +1215,13 @@ dependencies = [
 
 [[package]]
 name = "prometheus-http-query"
-version = "0.6.7"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6704e3a7a78545b1496524d518658005a6cc308abc90ce5fccf01891ecdc298b"
+checksum = "c23c14fa0dd14f7bf57122daaf373309af49140e9a4e10a972b401d4259660ec"
 dependencies = [
  "mime",
  "reqwest",
  "serde",
- "serde_json",
  "time",
  "url",
 ]

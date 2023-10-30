@@ -41,34 +41,24 @@ impl<'a> Query<'a> {
                 msg: e.to_string(),
                 span: Some(self.query.span()),
             },
-            prometheus_http_query::Error::ApiError(e) => LabeledError {
-                label: "Prometheus query error".to_string(),
-                msg: e.to_string(),
-                span: Some(self.query.span()),
-            },
             prometheus_http_query::Error::EmptySeriesSelector => LabeledError {
                 label: "Empty series selector".to_string(),
                 msg: "".to_string(),
                 span: Some(self.query.span()),
             },
             // This error should be impossible to reach because it should occur when building the client
-            prometheus_http_query::Error::UrlParse(e) => LabeledError {
+            prometheus_http_query::Error::ParseUrl(e) => LabeledError {
                 label: "Invalid URL".to_string(),
                 msg: e.to_string(),
                 span: None,
             },
-            prometheus_http_query::Error::ResponseParse(e) => LabeledError {
-                label: "Prometheus response parse error".to_string(),
+            prometheus_http_query::Error::Prometheus(e) => LabeledError {
+                label: "Prometheus error".to_string(),
                 msg: e.to_string(),
-                span: None,
-            },
-            prometheus_http_query::Error::MissingField(e) => LabeledError {
-                label: "Prometheus missing response field error".to_string(),
-                msg: e.to_string(),
-                span: None,
+                span: Some(self.query.span()),
             },
             e => LabeledError {
-                label: "Other prometheus query error".to_string(),
+                label: "Other error".to_string(),
                 msg: e.to_string(),
                 span: Some(self.query.span()),
             },
