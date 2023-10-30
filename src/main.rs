@@ -1,5 +1,6 @@
 mod client;
 mod prometheus;
+mod source;
 mod sub_command;
 
 pub(crate) use crate::sub_command::SubCommand;

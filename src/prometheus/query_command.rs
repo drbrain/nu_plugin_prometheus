@@ -1,4 +1,4 @@
-use crate::{client::Query, SubCommand};
+use crate::{client::Query, source::Source, SubCommand};
 use nu_plugin::{EvaluatedCall, LabeledError};
 use nu_protocol::{PluginSignature, SyntaxShape, Type, Value};
 
@@ -19,11 +19,17 @@ impl SubCommand for QueryCommand {
     fn signature(&self) -> PluginSignature {
         PluginSignature::build("prometheus query")
             .usage(self.usage())
-            .required_named(
+            .named(
                 "source",
                 SyntaxShape::String,
                 "Prometheus source to query",
                 Some('s'),
+            )
+            .named(
+                "url",
+                SyntaxShape::String,
+                "Prometheus source url to query",
+                Some('u'),
             )
             .named(
                 "cert",
@@ -58,21 +64,11 @@ impl SubCommand for QueryCommand {
     ) -> Result<Value, LabeledError> {
         assert_eq!("prometheus query", name);
 
-        let source = call.get_flag_value("source");
-
-        let Some(source) = source else {
-            return Err(LabeledError { label: "Missing required flag".into(), msg: "Missing --source flag".into(), span: Some(call.head) });
-        };
-
-        let Value::String { .. } = source else {
-            return Err(LabeledError { label: "Invalid argument type".into(), msg: "Expected --source to be a String".into(), span: Some(source.span()) });
-        };
-
         match input {
             Value::String { .. } => {
-                let client = crate::client::build(call, source)?;
+                let source: Source = call.try_into()?;
 
-                let query = Query::new(client, input);
+                let query = Query::new(source.try_into()?, input);
 
                 query.run()
             }

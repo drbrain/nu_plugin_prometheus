@@ -751,6 +751,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -948,6 +957,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2538530fd9f3c91e5da8f0f399afc30aead7dc2beda2d65269113b919300d1a1"
 
 [[package]]
+name = "nu-json"
+version = "0.86.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15a1cff294b2d443ee3897dab5ef1fdc6e8e0631db2bb3e342df80232d2dfa42"
+dependencies = [
+ "linked-hash-map",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "nu-path"
 version = "0.86.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1032,7 +1052,7 @@ dependencies = [
 name = "nu_plugin_prometheus"
 version = "0.1.0"
 dependencies = [
- "nu-engine",
+ "nu-json",
  "nu-plugin",
  "nu-protocol",
  "prometheus-http-query",
