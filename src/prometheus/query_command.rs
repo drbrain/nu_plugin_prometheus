@@ -1,17 +1,19 @@
-use crate::{client::Query, source::Source, SubCommand};
-use nu_plugin::{EvaluatedCall, LabeledError};
-use nu_protocol::{PluginSignature, SyntaxShape, Type, Value};
+use crate::{client::Query, source::Source, Prometheus};
+use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
+use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
 
 #[derive(Clone, Default)]
 pub struct QueryCommand;
 
-impl SubCommand for QueryCommand {
+impl SimplePluginCommand for QueryCommand {
+    type Plugin = Prometheus;
+
     fn name(&self) -> &str {
         "prometheus query"
     }
 
-    fn signature(&self) -> PluginSignature {
-        PluginSignature::build(self.name())
+    fn signature(&self) -> Signature {
+        Signature::build(self.name())
             .usage(self.usage())
             .named(
                 "source",
@@ -51,13 +53,12 @@ impl SubCommand for QueryCommand {
     }
 
     fn run(
-        &mut self,
-        name: &str,
+        &self,
+        _plugin: &Prometheus,
+        _engine: &EngineInterface,
         call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        assert_eq!("prometheus query", name);
-
         match input {
             Value::String { .. } => {
                 let source: Source = call.try_into()?;
@@ -66,11 +67,12 @@ impl SubCommand for QueryCommand {
 
                 query.run()
             }
-            _ => Err(LabeledError {
-                label: "Expected String input from pipeline".to_string(),
-                msg: format!("requires string input; got {}", input.get_type()),
-                span: Some(call.head),
-            }),
+            _ => Err(
+                LabeledError::new("Expected String input from pipeline").with_label(
+                    format!("requires string input; got {}", input.get_type()),
+                    call.head,
+                ),
+            ),
         }
     }
 }

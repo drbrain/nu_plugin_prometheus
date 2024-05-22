@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nu-json = "0.86.0"
-nu-plugin = "0.86.0"
-nu-protocol = { version = "0.86.0", features = [ "plugin" ] }
-prometheus-http-query = "0.7.0"
-reqwest = { version = "0.11.22", features = [ "native-tls" ] }
-tokio = { version ="1.33.0", features = [ "macros", "rt" ] }
+nu-json = "0.93.0"
+nu-plugin = "0.93.0"
+nu-protocol = { version = "0.93.0", features = [ "plugin" ] }
+prometheus-http-query = "0.8.3"
+reqwest = { version = "0.12.4", features = [ "native-tls" ] }
+tokio = { version ="1.37.0", features = [ "macros", "rt" ] }
