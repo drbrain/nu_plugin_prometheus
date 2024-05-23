@@ -1,6 +1,6 @@
 use nu_json::{Map, Value};
-use nu_plugin::EvaluatedCall;
-use nu_protocol::{record, LabeledError, Span};
+use nu_plugin::{EngineInterface, EvaluatedCall};
+use nu_protocol::{LabeledError, Record, Span};
 use prometheus_http_query::Client;
 use reqwest::{Certificate, Identity};
 use std::path::Path;
@@ -14,33 +14,68 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn list() -> Result<nu_protocol::Value, LabeledError> {
-        let span = Span::unknown();
-        let sources = load_sources()?;
+    pub fn list(engine: &EngineInterface) -> Result<Vec<Source>, LabeledError> {
+        let config = engine.get_plugin_config().map_err(|e| {
+            LabeledError::new("Plugin configuration not found").with_help(e.to_string())
+        })?;
 
-        let mut list = vec![];
+        let Some(config) = config else {
+            return Err(LabeledError::new("Plugin configuration not found"));
+        };
+
+        let Some(sources) = config.get_data_by_key("sources") else {
+            return Err(LabeledError::new("Invalid plugin configuration").with_help(r#"Missing "sources""#));
+        };
+
+        let sources = sources.as_record().map_err(|_| {
+            LabeledError::new("Invalid plugin configuration")
+                .with_label("must be a record", sources.span())
+        })?;
+
+        let mut result = vec![];
         for (name, source) in sources.iter() {
-            let Value::Object(source) = source else {
-                return Err(LabeledError::new(
-                    format!("source {name:?} in configuration is not an object"))
-                );
+            let span = source.span();
+
+            let source = source.as_record().map_err(|_| {
+                LabeledError::new("Invalid plugin configuration")
+                    .with_label(format!("Source {name:?} is not a record"), span)
+            })?;
+
+            let url = value_from_source(source, name, span, "url")?;
+
+            let url = url.clone().into_string().map_err(|_| {
+                LabeledError::new("Invalid plugin configuration").with_label(
+                    format!(r#"Source {name:?} field "url" is not a string"#),
+                    url.span(),
+                )
+            })?;
+
+            let cert = value_from_source(source, name, span, "cert").ok();
+            let key = value_from_source(source, name, span, "key").ok();
+
+            let identity = if let (Some(cert), Some(key)) = (cert, key) {
+                Some(identity(cert.clone(), key.clone())?)
+            } else {
+                None
             };
 
-            let entry = nu_protocol::Value::record(
-                record!(
-                    "name" => nu_protocol::Value::string(name, span.clone()),
-                    "url" => get_field_value(&source, "url"),
-                    "cert" => get_field_value(&source, "cert"),
-                    "key" => get_field_value(&source, "key"),
-                    "cacert" => get_field_value(&source, "cacert"),
-                ),
-                span.clone(),
-            );
+            let cacert = value_from_source(source, name, span, "cacert")
+                .ok()
+                .map(|cacert| certificate(cacert.clone()))
+                .transpose()?;
 
-            list.push(entry);
+            let source = Source {
+                name: Some(name.clone()),
+                url,
+                cacert,
+                identity,
+                span,
+            };
+
+            result.push(source);
         }
 
-        Ok(nu_protocol::Value::list(list, span.clone()))
+        Ok(result)
     }
 
     pub fn from_call(call: &EvaluatedCall) -> Result<Self, LabeledError> {
@@ -193,19 +228,25 @@ fn certificate(cacert: nu_protocol::Value) -> Result<Certificate, LabeledError> 
     Ok(cacert)
 }
 
+fn value_from_source<'a>(
+    source: &'a Record,
+    source_name: &str,
+    source_span: Span,
+    name: &str,
+) -> Result<&'a nu_protocol::Value, LabeledError> {
+    source.get(name).ok_or_else(|| {
+        LabeledError::new("Invalid plugin configuration").with_label(
+            format!("Source {source_name:?} missing {name} field"),
+            source_span,
+        )
+    })
+}
+
 fn get_field(chosen: &Map<String, Value>, field: &str) -> Option<String> {
     chosen
         .get(field)
         .and_then(|value| value.as_str())
         .map(|value| value.to_string())
-}
-
-fn get_field_value(chosen: &Map<String, Value>, field: &str) -> nu_protocol::Value {
-    let span = Span::unknown();
-
-    get_field(chosen, field).map_or(nu_protocol::Value::nothing(span), |url| {
-        nu_protocol::Value::string(url, span)
-    })
 }
 
 fn identity(cert: nu_protocol::Value, key: nu_protocol::Value) -> Result<Identity, LabeledError> {

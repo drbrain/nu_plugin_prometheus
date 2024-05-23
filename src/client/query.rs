@@ -34,17 +34,17 @@ impl<'a> Query<'a> {
     }
 
     fn into_labeled_error(&self, error: prometheus_http_query::Error) -> LabeledError {
+        use prometheus_http_query::Error;
+
         match error {
-            prometheus_http_query::Error::Client(e) => LabeledError::new("Prometheus client error")
+            Error::Client(e) => LabeledError::new("Prometheus client error")
                 .with_label(e.to_string(), self.query.span()),
-            prometheus_http_query::Error::EmptySeriesSelector => {
+            Error::EmptySeriesSelector => {
                 LabeledError::new("Empty series selector").with_label("", self.query.span())
             }
             // This error should be impossible to reach because it should occur when building the client
-            prometheus_http_query::Error::ParseUrl(e) => {
-                LabeledError::new("Invalid URL").with_help(e.to_string())
-            }
-            prometheus_http_query::Error::Prometheus(e) => {
+            Error::ParseUrl(e) => LabeledError::new("Invalid URL").with_help(e.to_string()),
+            Error::Prometheus(e) => {
                 LabeledError::new("Prometheus error").with_label(e.to_string(), self.query.span())
             }
             e => LabeledError::new("Other error").with_label(e.to_string(), self.query.span()),

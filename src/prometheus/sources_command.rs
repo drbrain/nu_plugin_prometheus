@@ -25,10 +25,18 @@ impl SimplePluginCommand for SourcesCommand {
     fn run(
         &self,
         _plugin: &Prometheus,
-        _engine: &EngineInterface,
+        engine: &EngineInterface,
         _call: &EvaluatedCall,
         _input: &Value,
     ) -> Result<Value, LabeledError> {
-        Source::list()
+        // validate
+        Source::list(engine)?;
+
+        Ok(engine
+            .get_plugin_config()
+            .expect("already validated by Source::list()")
+            .unwrap()
+            .get_data_by_key("sources")
+            .unwrap())
     }
 }
