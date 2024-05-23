@@ -27,24 +27,6 @@ impl SimplePluginCommand for QueryCommand {
                 "Prometheus source url to query",
                 Some('u'),
             )
-            .named(
-                "cert",
-                SyntaxShape::Filepath,
-                "Prometheus client certificate",
-                Some('c'),
-            )
-            .named(
-                "key",
-                SyntaxShape::Filepath,
-                "Prometheus client key",
-                Some('k'),
-            )
-            .named(
-                "cacert",
-                SyntaxShape::Filepath,
-                "Prometheus CA certificate",
-                Some('C'),
-            )
             .input_output_type(Type::String, Type::Any)
     }
 
@@ -55,24 +37,24 @@ impl SimplePluginCommand for QueryCommand {
     fn run(
         &self,
         _plugin: &Prometheus,
-        _engine: &EngineInterface,
+        engine: &EngineInterface,
         call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        match input {
-            Value::String { .. } => {
-                let source: Source = call.try_into()?;
-
-                let query = Query::new(source.try_into()?, input);
-
-                query.run()
-            }
-            _ => Err(
-                LabeledError::new("Expected String input from pipeline").with_label(
+        if !matches!(input, Value::String { .. }) {
+            // Unreachable as we only accept String input
+            return Err(
+                LabeledError::new("Expected query string from pipeline").with_label(
                     format!("requires string input; got {}", input.get_type()),
                     call.head,
                 ),
-            ),
+            );
         }
+
+        let source = Source::from(call, engine)?;
+
+        let query = Query::new(source.try_into()?, input);
+
+        query.run()
     }
 }

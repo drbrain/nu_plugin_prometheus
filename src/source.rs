@@ -1,10 +1,9 @@
-use nu_json::{Map, Value};
 use nu_plugin::{EngineInterface, EvaluatedCall};
-use nu_protocol::{LabeledError, Record, Span};
+use nu_protocol::{LabeledError, Record, Span, Value};
 use prometheus_http_query::Client;
 use reqwest::{Certificate, Identity};
-use std::path::Path;
 
+#[derive(Clone)]
 pub struct Source {
     pub name: Option<String>,
     pub url: String,
@@ -78,30 +77,42 @@ impl Source {
         Ok(result)
     }
 
-    pub fn from_call(call: &EvaluatedCall) -> Result<Self, LabeledError> {
+    pub fn from(call: &EvaluatedCall, engine: &EngineInterface) -> Result<Source, LabeledError> {
         let source = call.get_flag_value("source");
-        let url = call.get_flag_value("url");
 
-        if let Some(url) = url {
+        if let Some(url) = call.get_flag_value("url") {
             if let Some(source) = source {
                 return Err(LabeledError::new("Argument error")
                     .with_label("Supply only --source or --url, not both", source.span()));
             }
 
             Source::from_call_url(call, url)
-        } else if let Some(source) = source {
-            Source::from_config(source)
         } else {
-            Err(LabeledError::new("Argument error")
-                .with_label("Missing --source or --url flag", call.head))
+            let sources = Source::list(engine)?;
+
+            if let Some(source) = source {
+                let source_name = source.clone().into_string()?;
+
+                sources
+                    .iter()
+                    .find(|source| source.name == Some(source_name.clone()))
+                    .cloned()
+                    .ok_or_else(|| {
+                        LabeledError::new("Matching source not found")
+                            .with_label("this source is not configured", source.span())
+                    })
+            } else {
+                Err(
+                    LabeledError::new("Prometheus server not specified").with_help(
+                        "You must configure an unnamed default source or provide --source or --url",
+                    ),
+                )
+            }
         }
     }
 
-    fn from_call_url(
-        call: &EvaluatedCall,
-        url_value: nu_protocol::Value,
-    ) -> Result<Self, LabeledError> {
-        let nu_protocol::Value::String { val: ref url, .. } = url_value else {
+    fn from_call_url(call: &EvaluatedCall, url_value: Value) -> Result<Self, LabeledError> {
+        let Value::String { val: ref url, .. } = url_value else {
             return Err(LabeledError::new("Invalid argument type")
                 .with_label("Expected --url to be a String", url_value.span()));
         };
@@ -111,10 +122,7 @@ impl Source {
 
         let identity = make_identity(cert, key)?;
 
-        let cacert = call
-            .get_flag_value("cacert")
-            .map(|cacert| certificate(cacert))
-            .transpose()?;
+        let cacert = call.get_flag_value("cacert").map(certificate).transpose()?;
 
         Ok(Self {
             name: None,
@@ -123,62 +131,6 @@ impl Source {
             cacert,
             span: url_value.span(),
         })
-    }
-
-    fn from_config(source: nu_protocol::Value) -> Result<Self, LabeledError> {
-        let name = source.clone().into_string().unwrap();
-
-        let sources = load_sources()?;
-
-        let Some(chosen) = sources.get(&name) else {
-            return Err(LabeledError::new("Unable to find source").with_label(
-                format!("source {name:?} in configuration does not exist"),
-                source.span()));
-        };
-
-        let Value::Object(chosen) = chosen else {
-            return Err(LabeledError::new("Unable to find source").with_label(
-                format!("source {name:?} in configuration is not an object"),
-                source.span()));
-        };
-
-        let url = get_field(&chosen, "url");
-
-        let Some(url) = url else {
-                return Err(LabeledError::new("Unable to find source url").with_label(
-                    format!("source {name:?} in configuration is missing its \"url\" field"),
-                    source.span()));
-            };
-
-        let cert = get_field(&chosen, "cert")
-            .map(|cert| nu_protocol::Value::string(cert, Span::unknown()));
-        let key =
-            get_field(&chosen, "key").map(|key| nu_protocol::Value::string(key, Span::unknown()));
-
-        let identity = make_identity(cert, key)?;
-
-        let cacert = get_field(&chosen, "cacert")
-            .map(|cacert| nu_protocol::Value::string(cacert, Span::unknown()))
-            .map(|cacert| certificate(cacert))
-            .transpose()?;
-
-        let chosen = Self {
-            name: Some(name),
-            url,
-            identity,
-            cacert,
-            span: source.span(),
-        };
-
-        Ok(chosen)
-    }
-}
-
-impl TryFrom<&EvaluatedCall> for Source {
-    type Error = LabeledError;
-
-    fn try_from(call: &EvaluatedCall) -> Result<Self, Self::Error> {
-        Source::from_call(call)
     }
 }
 
@@ -212,7 +164,7 @@ impl TryFrom<Source> for Client {
     }
 }
 
-fn certificate(cacert: nu_protocol::Value) -> Result<Certificate, LabeledError> {
+fn certificate(cacert: Value) -> Result<Certificate, LabeledError> {
     let cacert_pem = read_pem(&cacert, "CA certificate")?;
 
     let cacert = Certificate::from_pem(&cacert_pem).map_err(|e| {
@@ -233,7 +185,7 @@ fn value_from_source<'a>(
     source_name: &str,
     source_span: Span,
     name: &str,
-) -> Result<&'a nu_protocol::Value, LabeledError> {
+) -> Result<&'a Value, LabeledError> {
     source.get(name).ok_or_else(|| {
         LabeledError::new("Invalid plugin configuration").with_label(
             format!("Source {source_name:?} missing {name} field"),
@@ -242,14 +194,7 @@ fn value_from_source<'a>(
     })
 }
 
-fn get_field(chosen: &Map<String, Value>, field: &str) -> Option<String> {
-    chosen
-        .get(field)
-        .and_then(|value| value.as_str())
-        .map(|value| value.to_string())
-}
-
-fn identity(cert: nu_protocol::Value, key: nu_protocol::Value) -> Result<Identity, LabeledError> {
+fn identity(cert: Value, key: Value) -> Result<Identity, LabeledError> {
     let cert_pem = read_pem(&cert, "Client certificate")?;
     let key_pem = read_pem(&key, "Client key")?;
 
@@ -259,53 +204,15 @@ fn identity(cert: nu_protocol::Value, key: nu_protocol::Value) -> Result<Identit
     })
 }
 
-fn load_sources() -> Result<Map<String, nu_json::Value>, LabeledError> {
-    let home = std::env::var("HOME").map_err(|e| {
-        LabeledError::new("Unable to load sources")
-            .with_help(format!("Could not find HOME env var: {e:?}"))
-    })?;
-
-    let config_file = Path::new(&home).join(".config/nu_plugin_prometheus.hjson");
-
-    let config: Map<String, Value> = std::fs::read(&config_file)
-        .map(|config| nu_json::from_slice(&config[..]))
-        .map_err(|e| {
-            LabeledError::new("Unable to load sources").with_help(format!(
-                "Unable to read configuration file at {config_file:?}: {e:?}"
-            ))
-        })?
-        .map_err(|e| {
-            LabeledError::new("Unable to load sources").with_help(format!(
-                "Unable to deserialize configuration file at {config_file:?}: {e:?}"
-            ))
-        })?;
-
-    let Some(sources) = config.get("sources") else {
-        return Err(LabeledError::new("Unable to load sources").with_help(
-            format!("Configuration file at {config_file:?} is missing a \"sources\" entry")));
-    };
-
-    let Value::Object(sources) = sources else {
-        return Err(LabeledError::new( "Unable to load sources").with_help(
-            format!("\"sources\" entry in configuration file at {config_file:?} is not a object")));
-    };
-
-    Ok(sources.clone())
-}
-
 fn make_identity(
-    cert: Option<nu_protocol::Value>,
-    key: Option<nu_protocol::Value>,
+    cert: Option<Value>,
+    key: Option<Value>,
 ) -> Result<Option<Identity>, LabeledError> {
     match (cert, key) {
         (None, None) => Ok(None),
         (Some(cert), Some(key)) => Ok(Some(identity(cert, key)?)),
-        (None, Some(key)) => {
-            return Err(missing_flag("client key", "--cert", key.span()));
-        }
-        (Some(cert), None) => {
-            return Err(missing_flag("client cert", "--key", cert.span()));
-        }
+        (None, Some(key)) => Err(missing_flag("client key", "--cert", key.span())),
+        (Some(cert), None) => Err(missing_flag("client cert", "--key", cert.span())),
     }
 }
 
@@ -314,7 +221,7 @@ fn missing_flag(have: &str, missing: &str, span: Span) -> LabeledError {
         .with_label(format!("Have {have}, missing {missing}"), span)
 }
 
-fn read_pem(value: &nu_protocol::Value, kind: &str) -> Result<Vec<u8>, LabeledError> {
+fn read_pem(value: &Value, kind: &str) -> Result<Vec<u8>, LabeledError> {
     let path = value.to_path()?;
     let pem = std::fs::read(path).map_err(|e| {
         LabeledError::new(format!(
