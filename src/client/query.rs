@@ -57,11 +57,7 @@ fn matrix_to_value(matrix: &[RangeVector]) -> Value {
         .iter()
         .map(|rv| {
             let metric = rv.metric();
-            let values = rv
-                .samples()
-                .iter()
-                .map(|sample| scalar_to_value(sample))
-                .collect();
+            let values = rv.samples().iter().map(scalar_to_value).collect();
 
             let name = metric
                 .get("__name__")
@@ -139,4 +135,105 @@ fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
         .enable_all()
         .build()
         .map_err(|e| LabeledError::new("Tokio runtime build error").with_help(e.to_string()))
+}
+
+#[cfg(test)]
+mod test {
+    use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
+
+    #[test]
+    fn matrix_to_value() {
+        let data = r#"[
+         {
+            "metric" : {
+               "__name__" : "up",
+               "job" : "prometheus",
+               "instance" : "localhost:9090"
+            },
+            "values" : [
+               [ 1435781430.781, "1" ],
+               [ 1435781445.781, "1" ],
+               [ 1435781460.781, "1" ]
+            ]
+         },
+         {
+            "metric" : {
+               "__name__" : "up",
+               "job" : "node",
+               "instance" : "localhost:9091"
+            },
+            "values" : [
+               [ 1435781430.781, "0" ],
+               [ 1435781445.781, "0" ],
+               [ 1435781460.781, "1" ]
+            ]
+         }
+      ]"#
+        .as_bytes();
+        let matrix: Vec<RangeVector> = serde_json::from_slice(data).unwrap();
+
+        let result = super::matrix_to_value(&matrix);
+
+        let record = result
+            .clone()
+            .into_list()
+            .unwrap()
+            .first()
+            .unwrap()
+            .clone()
+            .into_record()
+            .unwrap();
+
+        assert_eq!("up", record.get("name").unwrap().as_str().unwrap());
+
+        let labels = record.get("labels").unwrap().as_record().unwrap();
+
+        assert_eq!("prometheus", labels.get("job").unwrap().as_str().unwrap());
+
+        let values = record.get("values").unwrap().as_list().unwrap();
+
+        assert_eq!(3, values.len());
+    }
+
+    #[test]
+    fn scalar_to_value() {
+        let data = r#"[1716956024.754,"1"]"#.as_bytes();
+        let scalar: Sample = serde_json::from_slice(data).unwrap();
+
+        let result = super::scalar_to_value(&scalar).into_record().unwrap();
+
+        assert_eq!(1.0, result.get("value").unwrap().as_f64().unwrap());
+        assert_eq!(
+            1716956024,
+            result.get("timestamp").unwrap().as_f64().unwrap() as u64
+        );
+    }
+
+    #[test]
+    fn vector_to_value() {
+        let data = r#"[{"metric":{"__name__":"up","instance":"target.example","job":"job name"},"value":[1716956024.754,"1"]}]"#.as_bytes();
+        let vector: Vec<InstantVector> = serde_json::from_slice(data).unwrap();
+
+        let result = super::vector_to_value(&vector).into_list().unwrap();
+
+        let record = result.first().unwrap().as_record().unwrap();
+
+        assert_eq!("up", record.get("name").unwrap().as_str().unwrap());
+
+        let labels = record.get("labels").unwrap().as_record().unwrap();
+
+        assert_eq!("job name", labels.get("job").unwrap().as_str().unwrap());
+
+        let value = record
+            .get("value")
+            .unwrap()
+            .as_record()
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .as_f64()
+            .unwrap();
+
+        assert_eq!(1.0, value);
+    }
 }

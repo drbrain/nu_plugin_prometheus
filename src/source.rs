@@ -211,13 +211,13 @@ fn make_identity(
     match (cert, key) {
         (None, None) => Ok(None),
         (Some(cert), Some(key)) => Ok(Some(identity(cert, key)?)),
-        (None, Some(key)) => Err(missing_flag("client key", "--cert", key.span())),
-        (Some(cert), None) => Err(missing_flag("client cert", "--key", cert.span())),
+        (None, Some(key)) => Err(missing_entry("client key", "cert", key.span())),
+        (Some(cert), None) => Err(missing_entry("client cert", "key", cert.span())),
     }
 }
 
-fn missing_flag(have: &str, missing: &str, span: Span) -> LabeledError {
-    LabeledError::new("Missing TLS flag")
+fn missing_entry(have: &str, missing: &str, span: Span) -> LabeledError {
+    LabeledError::new("Missing TLS item")
         .with_label(format!("Have {have}, missing {missing}"), span)
 }
 
@@ -232,4 +232,123 @@ fn read_pem(value: &Value, kind: &str) -> Result<Vec<u8>, LabeledError> {
     })?;
 
     Ok(pem)
+}
+
+#[cfg(test)]
+mod test {
+    use nu_protocol::{Span, Value};
+    use prometheus_http_query::Client;
+    use rstest::rstest;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    fn cert_path() -> PathBuf {
+        Path::new(file!())
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("test/fixtures/cert.pem")
+    }
+
+    fn cert_value() -> Value {
+        Value::string(cert_path().to_string_lossy(), Span::unknown())
+    }
+
+    fn key_path() -> PathBuf {
+        Path::new(file!())
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("test/fixtures/key.pem")
+    }
+
+    fn key_value() -> Value {
+        Value::string(key_path().to_string_lossy(), Span::unknown())
+    }
+
+    #[test]
+    fn certificate() {
+        assert!(super::certificate(cert_value()).is_ok());
+    }
+
+    #[test]
+    fn identity() {
+        assert!(super::identity(cert_value(), key_value()).is_ok());
+    }
+
+    #[rstest]
+    #[case(None, None, Ok(None))]
+    #[case(None, Some(key_value()), Err(("client key", "cert")))]
+    #[case(Some(cert_value()), None, Err(("client cert", "key")))]
+    #[case(Some(cert_value()), Some(key_value()), Ok(Some(())))]
+    fn make_identity(
+        #[case] cert: Option<Value>,
+        #[case] key: Option<Value>,
+        #[case] expected: Result<Option<()>, (&str, &str)>,
+    ) {
+        let result = super::make_identity(cert, key);
+
+        match expected {
+            Ok(Some(_)) => {
+                assert!(matches!(result, Ok(Some(_))));
+            }
+            Ok(None) => {
+                assert!(matches!(result, Ok(None)));
+            }
+            Err((have, missing)) => {
+                let expected = super::missing_entry(have, missing, Span::unknown());
+
+                assert_eq!(expected, result.unwrap_err());
+            }
+        }
+    }
+
+    #[test]
+    fn missing_entry() {
+        let err = super::missing_entry("first", "second", Span::test_data());
+
+        assert_eq!("Missing TLS item", err.msg);
+
+        let label = err.labels.first().unwrap();
+        assert_eq!("Have first, missing second", label.text);
+    }
+
+    #[test]
+    fn read_pem() {
+        let key_path = key_path();
+        let expected = fs::read(&key_path).unwrap();
+
+        let pem = super::read_pem(
+            &Value::string(key_path.to_string_lossy(), Span::unknown()),
+            "key",
+        )
+        .unwrap();
+
+        assert_eq!(expected, pem);
+    }
+
+    #[test]
+    fn source_from_client() {
+        let url = "https://prometheus.example/";
+
+        let source = super::Source {
+            name: Some("test".into()),
+            url: url.into(),
+            identity: None,
+            cacert: None,
+            span: Span::unknown(),
+        };
+
+        let result = TryInto::<Client>::try_into(source);
+
+        let Ok(client) = result else {
+            unreachable!("Client not created");
+        };
+
+        assert_eq!(url, client.base_url().as_str());
+    }
 }
