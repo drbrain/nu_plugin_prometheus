@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nu-json = "0.93.0"
 nu-plugin = "0.93.0"
 nu-protocol = { version = "0.93.0", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
