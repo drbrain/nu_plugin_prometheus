@@ -21,7 +21,7 @@ impl<'a> Query<'a> {
                 .query(self.query.clone().into_string().unwrap())
                 .get()
                 .await
-                .map_err(|error| self.into_labeled_error(error))?;
+                .map_err(|error| self.as_labeled_error(error))?;
 
             let value = match response.data() {
                 Data::Vector(v) => vector_to_value(v),
@@ -33,7 +33,7 @@ impl<'a> Query<'a> {
         })
     }
 
-    fn into_labeled_error(&self, error: prometheus_http_query::Error) -> LabeledError {
+    fn as_labeled_error(&self, error: prometheus_http_query::Error) -> LabeledError {
         use prometheus_http_query::Error;
 
         match error {
