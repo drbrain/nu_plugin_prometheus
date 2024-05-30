@@ -101,7 +101,8 @@ fn vector_to_value(vector: &[InstantVector]) -> Value {
         .iter()
         .map(|iv| {
             let metric = iv.metric();
-            let value = scalar_to_value(iv.sample());
+            let value = Value::float(iv.sample().value(), Span::unknown());
+            let timestamp = Value::float(iv.sample().timestamp(), Span::unknown());
 
             let name = metric
                 .get("__name__")
@@ -121,6 +122,7 @@ fn vector_to_value(vector: &[InstantVector]) -> Value {
                     "name" => Value::string(name, Span::unknown()),
                     "labels" => Value::record(labels, Span::unknown()),
                     "value" => value,
+                    "timestamp" => timestamp,
                 },
                 Span::unknown(),
             )
@@ -224,16 +226,12 @@ mod test {
 
         assert_eq!("job name", labels.get("job").unwrap().as_str().unwrap());
 
-        let value = record
-            .get("value")
-            .unwrap()
-            .as_record()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_f64()
-            .unwrap();
+        let value = record.get("value").unwrap().as_f64().unwrap();
 
         assert_eq!(1.0, value);
+
+        let timestamp = record.get("timestamp").unwrap().as_f64().unwrap();
+
+        assert_eq!(1716956024, timestamp as u64);
     }
 }
