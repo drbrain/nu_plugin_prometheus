@@ -15,6 +15,7 @@ impl SimplePluginCommand for QueryCommand {
     fn signature(&self) -> Signature {
         Signature::build(self.name())
             .usage(self.usage())
+            .named("at", SyntaxShape::DateTime, "Evaluation timestamp", None)
             .named(
                 "source",
                 SyntaxShape::String,
@@ -55,6 +56,10 @@ impl SimplePluginCommand for QueryCommand {
         let source = Source::from(call, engine)?;
 
         let mut query_builder = QueryBuilder::new(source.try_into()?);
+
+        if let Some(at) = call.get_flag("at")? {
+            query_builder.at(at);
+        }
 
         if call.has_flag("flatten")? {
             query_builder.flatten();

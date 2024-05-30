@@ -1,60 +1,46 @@
 use nu_protocol::{record, LabeledError, Record, Span, Value};
 use prometheus_http_query::{
     response::{Data, InstantVector, RangeVector, Sample},
-    Client,
+    InstantQueryBuilder,
 };
 use std::collections::HashMap;
 
-pub struct Query<'a> {
-    client: Client,
+pub struct Query {
+    query: InstantQueryBuilder,
+    span: Span,
     flatten: bool,
-    query: &'a Value,
 }
 
-impl<'a> Query<'a> {
-    pub fn new(client: Client, query: &'a Value, flatten: bool) -> Self {
+impl Query {
+    pub fn new(query: InstantQueryBuilder, span: Span, flatten: bool) -> Self {
         Self {
-            client,
             query,
+            span,
             flatten,
         }
     }
 
-    pub fn run(&self) -> Result<Value, LabeledError> {
+    pub fn run(self) -> Result<Value, LabeledError> {
+        let Query {
+            query,
+            span,
+            flatten,
+        } = self;
+
         runtime()?.block_on(async {
-            let response = self
-                .client
-                .query(self.query.clone().into_string().unwrap())
+            let response = query
                 .get()
                 .await
-                .map_err(|error| self.as_labeled_error(error))?;
+                .map_err(|error| labeled_error(error, span))?;
 
             let value = match response.data() {
-                Data::Vector(v) => vector_to_value(v, self.flatten),
-                Data::Matrix(m) => matrix_to_value(m, self.flatten),
+                Data::Vector(v) => vector_to_value(v, flatten),
+                Data::Matrix(m) => matrix_to_value(m, flatten),
                 Data::Scalar(s) => scalar_to_value(s),
             };
 
             Ok(value)
         })
-    }
-
-    fn as_labeled_error(&self, error: prometheus_http_query::Error) -> LabeledError {
-        use prometheus_http_query::Error;
-
-        match error {
-            Error::Client(e) => LabeledError::new("Prometheus client error")
-                .with_label(e.to_string(), self.query.span()),
-            Error::EmptySeriesSelector => {
-                LabeledError::new("Empty series selector").with_label("", self.query.span())
-            }
-            // This error should be impossible to reach because it should occur when building the client
-            Error::ParseUrl(e) => LabeledError::new("Invalid URL").with_help(e.to_string()),
-            Error::Prometheus(e) => {
-                LabeledError::new("Prometheus error").with_label(e.to_string(), self.query.span())
-            }
-            e => LabeledError::new("Other error").with_label(e.to_string(), self.query.span()),
-        }
     }
 }
 
@@ -77,6 +63,25 @@ fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bo
         }
 
         record.insert("labels", Value::record(labels, Span::unknown()));
+    }
+}
+
+fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledError {
+    use prometheus_http_query::Error;
+
+    match error {
+        Error::Client(e) => {
+            LabeledError::new("Prometheus client error").with_label(e.to_string(), span)
+        }
+        Error::EmptySeriesSelector => {
+            LabeledError::new("Empty series selector").with_label("", span)
+        }
+        // This error should be impossible to reach because it should occur when building the client
+        Error::ParseUrl(e) => LabeledError::new("Invalid URL").with_help(e.to_string()),
+        Error::Prometheus(e) => {
+            LabeledError::new("Prometheus error").with_label(e.to_string(), span)
+        }
+        e => LabeledError::new("Other error").with_label(e.to_string(), span),
     }
 }
 

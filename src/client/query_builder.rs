@@ -27,6 +27,16 @@ impl QueryBuilder {
     }
 
     pub fn build(self, query: &Value) -> Query {
-        Query::new(self.client, query, self.flatten)
+        let span = query.span();
+
+        let query = query.clone().into_string().expect("Query must be a String");
+
+        let mut query = self.client.query(query);
+
+        if let Some(at) = self.at {
+            query = query.at(at.timestamp());
+        }
+
+        Query::new(query, span, self.flatten)
     }
 }
