@@ -27,6 +27,7 @@ impl SimplePluginCommand for QueryCommand {
                 "Prometheus source url to query",
                 Some('u'),
             )
+            .switch("flatten", "Flatten labels into record", Some('f'))
             .input_output_type(Type::String, Type::Any)
     }
 
@@ -53,7 +54,9 @@ impl SimplePluginCommand for QueryCommand {
 
         let source = Source::from(call, engine)?;
 
-        let query = Query::new(source.try_into()?, input);
+        let flatten = call.has_flag("flatten")?;
+
+        let query = Query::new(source.try_into()?, input, flatten);
 
         query.run()
     }

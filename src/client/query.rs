@@ -3,15 +3,21 @@ use prometheus_http_query::{
     response::{Data, InstantVector, RangeVector, Sample},
     Client,
 };
+use std::collections::HashMap;
 
 pub struct Query<'a> {
     client: Client,
+    flatten: bool,
     query: &'a Value,
 }
 
 impl<'a> Query<'a> {
-    pub fn new(client: Client, query: &'a Value) -> Self {
-        Self { client, query }
+    pub fn new(client: Client, query: &'a Value, flatten: bool) -> Self {
+        Self {
+            client,
+            query,
+            flatten,
+        }
     }
 
     pub fn run(&self) -> Result<Value, LabeledError> {
@@ -24,8 +30,8 @@ impl<'a> Query<'a> {
                 .map_err(|error| self.as_labeled_error(error))?;
 
             let value = match response.data() {
-                Data::Vector(v) => vector_to_value(v),
-                Data::Matrix(m) => matrix_to_value(m),
+                Data::Vector(v) => vector_to_value(v, self.flatten),
+                Data::Matrix(m) => matrix_to_value(m, self.flatten),
                 Data::Scalar(s) => scalar_to_value(s),
             };
 
@@ -52,7 +58,29 @@ impl<'a> Query<'a> {
     }
 }
 
-fn matrix_to_value(matrix: &[RangeVector]) -> Value {
+fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bool) {
+    if flatten {
+        for (name, label) in metric {
+            if name == "__name__" {
+                continue;
+            }
+
+            record.push(name, Value::string(label, Span::unknown()));
+        }
+    } else {
+        let mut labels = Record::new();
+        for (name, label) in metric {
+            if name == "__name__" {
+                continue;
+            }
+            labels.push(name, Value::string(label, Span::unknown()));
+        }
+
+        record.insert("labels", Value::record(labels, Span::unknown()));
+    }
+}
+
+fn matrix_to_value(matrix: &[RangeVector], flatten: bool) -> Value {
     let records = matrix
         .iter()
         .map(|rv| {
@@ -64,22 +92,15 @@ fn matrix_to_value(matrix: &[RangeVector]) -> Value {
                 .cloned()
                 .unwrap_or("[UNKNOWN]".to_string());
 
-            let mut labels = Record::new();
-            for (name, label) in metric {
-                if name == "__name__" {
-                    continue;
-                }
-                labels.push(name, Value::string(label, Span::unknown()));
-            }
+            let mut record = record! {
+                "name" => Value::string(name, Span::unknown()),
+            };
 
-            Value::record(
-                record! {
-                    "name" => Value::string(name, Span::unknown()),
-                    "labels" => Value::record(labels, Span::unknown()),
-                    "values" => Value::list(values, Span::unknown()),
-                },
-                Span::unknown(),
-            )
+            add_labels(&mut record, metric, flatten);
+
+            record.insert("values", Value::list(values, Span::unknown()));
+
+            Value::record(record, Span::unknown())
         })
         .collect();
 
@@ -96,36 +117,30 @@ fn scalar_to_value(scalar: &Sample) -> Value {
     )
 }
 
-fn vector_to_value(vector: &[InstantVector]) -> Value {
+fn vector_to_value(vector: &[InstantVector], flatten: bool) -> Value {
     let records = vector
         .iter()
         .map(|iv| {
             let metric = iv.metric();
-            let value = Value::float(iv.sample().value(), Span::unknown());
-            let timestamp = Value::float(iv.sample().timestamp(), Span::unknown());
 
             let name = metric
                 .get("__name__")
                 .cloned()
                 .unwrap_or("[UNKNOWN]".to_string());
 
-            let mut labels = Record::new();
-            for (name, label) in metric {
-                if name == "__name__" {
-                    continue;
-                }
-                labels.push(name, Value::string(label, Span::unknown()));
-            }
+            let mut record = record! {
+                "name" => Value::string(name, Span::unknown()),
+            };
 
-            Value::record(
-                record! {
-                    "name" => Value::string(name, Span::unknown()),
-                    "labels" => Value::record(labels, Span::unknown()),
-                    "value" => value,
-                    "timestamp" => timestamp,
-                },
-                Span::unknown(),
-            )
+            add_labels(&mut record, metric, flatten);
+
+            let value = Value::float(iv.sample().value(), Span::unknown());
+            record.insert("value", value);
+
+            let timestamp = Value::float(iv.sample().timestamp(), Span::unknown());
+            record.insert("timestamp", timestamp);
+
+            Value::record(record, Span::unknown())
         })
         .collect();
 
@@ -141,7 +156,51 @@ fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
 
 #[cfg(test)]
 mod test {
+    use nu_protocol::{record, Span, Value};
     use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
+    use std::collections::HashMap;
+
+    #[test]
+    fn add_labels_flatten() {
+        let mut metric = HashMap::new();
+        metric.insert("job".into(), "prometheus".into());
+        metric.insert("instance".into(), "localhost:9090".into());
+
+        let mut record = record! {};
+
+        super::add_labels(&mut record, &metric, true);
+
+        assert_eq!(
+            Value::string("prometheus", Span::unknown()),
+            record.get("job").unwrap().clone()
+        );
+
+        assert_eq!(
+            Value::string("localhost:9090", Span::unknown()),
+            record.get("instance").unwrap().clone()
+        );
+    }
+
+    #[test]
+    fn add_labels_no_flatten() {
+        let mut metric = HashMap::new();
+        metric.insert("job".into(), "prometheus".into());
+        metric.insert("instance".into(), "localhost:9090".into());
+
+        let mut record = record! {};
+
+        super::add_labels(&mut record, &metric, false);
+
+        let expected = Value::record(
+            record! {
+                "job" => Value::string("prometheus", Span::unknown()),
+                "instance" => Value::string("localhost:9090", Span::unknown()),
+            },
+            Span::unknown(),
+        );
+
+        assert_eq!(expected, record.get("labels").unwrap().clone());
+    }
 
     #[test]
     fn matrix_to_value() {
@@ -174,7 +233,7 @@ mod test {
         .as_bytes();
         let matrix: Vec<RangeVector> = serde_json::from_slice(data).unwrap();
 
-        let result = super::matrix_to_value(&matrix);
+        let result = super::matrix_to_value(&matrix, false);
 
         let record = result
             .clone()
@@ -216,7 +275,7 @@ mod test {
         let data = r#"[{"metric":{"__name__":"up","instance":"target.example","job":"job name"},"value":[1716956024.754,"1"]}]"#.as_bytes();
         let vector: Vec<InstantVector> = serde_json::from_slice(data).unwrap();
 
-        let result = super::vector_to_value(&vector).into_list().unwrap();
+        let result = super::vector_to_value(&vector, false).into_list().unwrap();
 
         let record = result.first().unwrap().as_record().unwrap();
 
