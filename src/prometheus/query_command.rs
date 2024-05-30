@@ -1,4 +1,4 @@
-use crate::{client::Query, source::Source, Prometheus};
+use crate::{client::QueryBuilder, source::Source, Prometheus};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
 
@@ -54,9 +54,13 @@ impl SimplePluginCommand for QueryCommand {
 
         let source = Source::from(call, engine)?;
 
-        let flatten = call.has_flag("flatten")?;
+        let mut query_builder = QueryBuilder::new(source.try_into()?);
 
-        let query = Query::new(source.try_into()?, input, flatten);
+        if call.has_flag("flatten")? {
+            query_builder.flatten();
+        }
+
+        let query = query_builder.build(input);
 
         query.run()
     }
