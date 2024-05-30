@@ -16,6 +16,7 @@ impl SimplePluginCommand for QueryCommand {
         Signature::build(self.name())
             .usage(self.usage())
             .named("at", SyntaxShape::DateTime, "Evaluation timestamp", None)
+            .named("timeout", SyntaxShape::Number, "Evaluation timeout", None)
             .named(
                 "source",
                 SyntaxShape::String,
@@ -59,6 +60,10 @@ impl SimplePluginCommand for QueryCommand {
 
         if let Some(at) = call.get_flag("at")? {
             query_builder.at(at);
+        }
+
+        if let Some(timeout) = call.get_flag("timeout")? {
+            query_builder.timeout(timeout);
         }
 
         if call.has_flag("flatten")? {

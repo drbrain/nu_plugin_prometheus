@@ -7,6 +7,7 @@ pub struct QueryBuilder {
     at: Option<DateTime<FixedOffset>>,
     client: Client,
     flatten: bool,
+    timeout: Option<i64>,
 }
 
 impl QueryBuilder {
@@ -15,6 +16,7 @@ impl QueryBuilder {
             at: None,
             client,
             flatten: false,
+            timeout: None,
         }
     }
 
@@ -26,6 +28,10 @@ impl QueryBuilder {
         self.flatten = true;
     }
 
+    pub fn timeout(&mut self, timeout: i64) {
+        self.timeout = Some(timeout);
+    }
+
     pub fn build(self, query: &Value) -> Query {
         let span = query.span();
 
@@ -35,6 +41,10 @@ impl QueryBuilder {
 
         if let Some(at) = self.at {
             query = query.at(at.timestamp());
+        }
+
+        if let Some(timeout) = self.timeout {
+            query = query.timeout(timeout);
         }
 
         Query::new(query, span, self.flatten)
