@@ -28,7 +28,9 @@ This will output a table:
 
 A range query requires `--start`, `--end` and `--step` arguments:
 
-`"up" | prometheus query range --url https://prometheus.example:9090/ --start ((date now) - 30sec) --end (date now) --step 15sec`
+```nushell
+"up" | prometheus query range --url https://prometheus.example:9090/ --start ((date now) - 30sec) --end (date now) --step 15sec
+```
 
 |name|labels|values|
 |-|-|-|
