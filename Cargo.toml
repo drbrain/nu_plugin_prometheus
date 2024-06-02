@@ -1,9 +1,16 @@
 [package]
 name = "nu_plugin_prometheus"
-description = "A nushell plugin for querying prometheus"
 version = "0.1.0"
 edition = "2021"
+
+authors = ["Eric Hodel <drbrain@segment7.net>"]
+description = "A nushell plugin for querying prometheus"
+homepage = "https://github.com/drbrain/nu_plugin_prometheus"
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/drbrain/nu_plugin_prometheus"
+keywords = ["nu", "plugin", "prometheus"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
