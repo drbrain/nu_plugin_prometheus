@@ -1,50 +1,8 @@
 use nu_protocol::{record, LabeledError, Record, Span, Value};
-use prometheus_http_query::{
-    response::{Data, InstantVector, RangeVector, Sample},
-    InstantQueryBuilder,
-};
+use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
 use std::collections::HashMap;
 
-pub struct Query {
-    query: InstantQueryBuilder,
-    span: Span,
-    flatten: bool,
-}
-
-impl Query {
-    pub fn new(query: InstantQueryBuilder, span: Span, flatten: bool) -> Self {
-        Self {
-            query,
-            span,
-            flatten,
-        }
-    }
-
-    pub fn run(self) -> Result<Value, LabeledError> {
-        let Query {
-            query,
-            span,
-            flatten,
-        } = self;
-
-        runtime()?.block_on(async {
-            let response = query
-                .get()
-                .await
-                .map_err(|error| labeled_error(error, span))?;
-
-            let value = match response.data() {
-                Data::Vector(v) => vector_to_value(v, flatten),
-                Data::Matrix(m) => matrix_to_value(m, flatten),
-                Data::Scalar(s) => scalar_to_value(s),
-            };
-
-            Ok(value)
-        })
-    }
-}
-
-fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bool) {
+pub(crate) fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bool) {
     if flatten {
         for (name, label) in metric {
             if name == "__name__" {
@@ -66,7 +24,7 @@ fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bo
     }
 }
 
-fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledError {
+pub(crate) fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledError {
     use prometheus_http_query::Error;
 
     match error {
@@ -85,7 +43,7 @@ fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledErro
     }
 }
 
-fn matrix_to_value(matrix: &[RangeVector], flatten: bool) -> Value {
+pub(crate) fn matrix_to_value(matrix: &[RangeVector], flatten: bool) -> Value {
     let records = matrix
         .iter()
         .map(|rv| {
@@ -112,7 +70,14 @@ fn matrix_to_value(matrix: &[RangeVector], flatten: bool) -> Value {
     Value::list(records, Span::unknown())
 }
 
-fn scalar_to_value(scalar: &Sample) -> Value {
+pub(crate) fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| LabeledError::new("Tokio runtime build error").with_help(e.to_string()))
+}
+
+pub(crate) fn scalar_to_value(scalar: &Sample) -> Value {
     Value::record(
         record! {
             "value" => Value::float(scalar.value(), Span::unknown()),
@@ -122,7 +87,7 @@ fn scalar_to_value(scalar: &Sample) -> Value {
     )
 }
 
-fn vector_to_value(vector: &[InstantVector], flatten: bool) -> Value {
+pub(crate) fn vector_to_value(vector: &[InstantVector], flatten: bool) -> Value {
     let records = vector
         .iter()
         .map(|iv| {
@@ -150,13 +115,6 @@ fn vector_to_value(vector: &[InstantVector], flatten: bool) -> Value {
         .collect();
 
     Value::list(records, Span::unknown())
-}
-
-fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| LabeledError::new("Tokio runtime build error").with_help(e.to_string()))
 }
 
 #[cfg(test)]

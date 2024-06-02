@@ -3,22 +3,34 @@ use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
 
 #[derive(Clone, Default)]
-pub struct QueryCommand;
+pub struct QueryRangeCommand;
 
-impl SimplePluginCommand for QueryCommand {
+impl SimplePluginCommand for QueryRangeCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
-        "prometheus query"
+        "prometheus query range"
     }
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
             .usage(self.usage())
             .named(
-                "at",
+                "start",
                 SyntaxShape::DateTime,
-                "Evaluation timestamp for an instant query",
+                "Start timestamp for a range query",
+                None,
+            )
+            .named(
+                "end",
+                SyntaxShape::DateTime,
+                "End timestamp for a range query",
+                None,
+            )
+            .named(
+                "step",
+                SyntaxShape::Duration,
+                "Query resolution step width",
                 None,
             )
             .named("timeout", SyntaxShape::Number, "Evaluation timeout", None)
@@ -39,7 +51,7 @@ impl SimplePluginCommand for QueryCommand {
     }
 
     fn usage(&self) -> &str {
-        "Run an instant prometheus query"
+        "Run a range prometheus query"
     }
 
     fn run(
@@ -71,8 +83,31 @@ impl SimplePluginCommand for QueryCommand {
             query_builder.flatten();
         }
 
-        let at = call.get_flag("at")?;
+        let start = call.get_flag("start")?;
+        let end = call.get_flag("end")?;
+        let step = call.get_flag::<i64>("step")?;
 
-        query_builder.instant(at, query).run()
+        match (start, end, step) {
+            (Some(start), Some(end), Some(step)) => {
+                query_builder.range(start, end, step as f64, query).run()
+            }
+            _ => {
+                let mut missing = vec![];
+
+                if call.get_flag_value("start").is_none() {
+                    missing.push("--start");
+                }
+                if call.get_flag_value("end").is_none() {
+                    missing.push("--end");
+                }
+                if call.get_flag_value("step").is_none() {
+                    missing.push("--step");
+                }
+                let missing = missing.join(", ");
+
+                Err(LabeledError::new("Missing query range arguments")
+                    .with_label(format!("Missing: {missing}"), query.span()))
+            }
+        }
     }
 }

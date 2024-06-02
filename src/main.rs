@@ -1,5 +1,6 @@
 mod client;
 mod prometheus;
+mod query;
 mod source;
 
 use nu_plugin::{serve_plugin, JsonSerializer};
