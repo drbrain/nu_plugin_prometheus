@@ -89,7 +89,9 @@ impl SimplePluginCommand for QueryRangeCommand {
 
         match (start, end, step) {
             (Some(start), Some(end), Some(step)) => {
-                query_builder.range(start, end, step as f64, query).run()
+                let step = step as f64 / 1_000_000_000.0;
+
+                query_builder.range(start, end, step, query).run()
             }
             _ => {
                 let mut missing = vec![];
