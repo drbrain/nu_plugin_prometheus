@@ -1,6 +1,6 @@
 use crate::{
-    client::{labeled_error, runtime},
     query::{matrix_to_value, scalar_to_value, vector_to_value},
+    Client,
 };
 use nu_protocol::{LabeledError, Span, Value};
 use prometheus_http_query::{response::Data, RangeQueryBuilder};
@@ -22,16 +22,17 @@ impl QueryRange {
 
     pub fn run(self) -> Result<Value, LabeledError> {
         let QueryRange {
-            query,
+            ref query,
             span,
             flatten,
         } = self;
 
-        runtime()?.block_on(async {
+        self.runtime()?.block_on(async {
             let response = query
+                .clone()
                 .get()
                 .await
-                .map_err(|error| labeled_error(error, span))?;
+                .map_err(|error| self.labeled_error(error, span))?;
 
             let value = match response.data() {
                 Data::Vector(v) => vector_to_value(v, flatten),
@@ -43,3 +44,5 @@ impl QueryRange {
         })
     }
 }
+
+impl Client for QueryRange {}

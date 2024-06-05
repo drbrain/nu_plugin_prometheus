@@ -1,20 +1,24 @@
-use crate::client::{labeled_error, runtime};
+use crate::Client;
 use chrono::DateTime;
 use nu_protocol::{record, LabeledError, Span, Value};
 use prometheus_http_query::{
     response::{ActiveTarget, DroppedTarget},
-    Client, TargetState,
+    TargetState,
 };
 use std::collections::HashMap;
 
 pub struct Targets {
-    client: Client,
+    client: prometheus_http_query::Client,
     span: Span,
     target_state: Option<TargetState>,
 }
 
 impl Targets {
-    pub fn new(client: Client, span: Span, target_state: Option<TargetState>) -> Self {
+    pub fn new(
+        client: prometheus_http_query::Client,
+        span: Span,
+        target_state: Option<TargetState>,
+    ) -> Self {
         Self {
             client,
             span,
@@ -24,10 +28,18 @@ impl Targets {
 
     pub fn run(self) -> Result<Value, LabeledError> {
         let Self {
-            client,
+            ref client,
             span,
-            target_state,
+            ref target_state,
         } = self;
+
+        // NOTE: Doesn't impl Clone
+        let target_state = match &target_state {
+            Some(TargetState::Any) => Some(TargetState::Any),
+            Some(TargetState::Dropped) => Some(TargetState::Dropped),
+            Some(TargetState::Active) => Some(TargetState::Active),
+            None => None,
+        };
 
         // NOTE: Doesn't impl Clone
         let target_state2 = match &target_state {
@@ -37,11 +49,11 @@ impl Targets {
             None => None,
         };
 
-        runtime()?.block_on(async {
+        self.runtime()?.block_on(async {
             let targets = client
                 .targets(target_state)
                 .await
-                .map_err(|error| labeled_error(error, span))?;
+                .map_err(|error| self.labeled_error(error, span))?;
 
             let value = match target_state2 {
                 Some(TargetState::Active) => active(targets.active()),
@@ -60,6 +72,8 @@ impl Targets {
         })
     }
 }
+
+impl Client for Targets {}
 
 fn active(active: &[ActiveTarget]) -> Value {
     let active: Vec<_> = active
