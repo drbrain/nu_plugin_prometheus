@@ -1,4 +1,4 @@
-use nu_protocol::{record, LabeledError, Record, Span, Value};
+use nu_protocol::{record, Record, Span, Value};
 use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
 use std::collections::HashMap;
 
@@ -21,25 +21,6 @@ pub(crate) fn add_labels(record: &mut Record, metric: &HashMap<String, String>, 
         }
 
         record.insert("labels", Value::record(labels, Span::unknown()));
-    }
-}
-
-pub(crate) fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledError {
-    use prometheus_http_query::Error;
-
-    match error {
-        Error::Client(e) => {
-            LabeledError::new("Prometheus client error").with_label(e.to_string(), span)
-        }
-        Error::EmptySeriesSelector => {
-            LabeledError::new("Empty series selector").with_label("", span)
-        }
-        // This error should be impossible to reach because it should occur when building the client
-        Error::ParseUrl(e) => LabeledError::new("Invalid URL").with_help(e.to_string()),
-        Error::Prometheus(e) => {
-            LabeledError::new("Prometheus error").with_label(e.to_string(), span)
-        }
-        e => LabeledError::new("Other error").with_label(e.to_string(), span),
     }
 }
 
@@ -68,13 +49,6 @@ pub(crate) fn matrix_to_value(matrix: &[RangeVector], flatten: bool) -> Value {
         .collect();
 
     Value::list(records, Span::unknown())
-}
-
-pub(crate) fn runtime() -> Result<tokio::runtime::Runtime, LabeledError> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| LabeledError::new("Tokio runtime build error").with_help(e.to_string()))
 }
 
 pub(crate) fn scalar_to_value(scalar: &Sample) -> Value {

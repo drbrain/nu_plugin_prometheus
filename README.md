@@ -45,9 +45,9 @@ Use `--source` or `-s` to use a configured source:
 "up" | prometheus query --source prod
 ```
 
-## Queries
+### Queries
 
-### Instant
+#### Instant
 
 Pipe a prometheus query to `prometheus query` for an instant query:
 
@@ -62,7 +62,7 @@ This will output a table:
 |up|{job: prometheus, instance: prometheus.example:9090}|1|1435781451|
 |up|{job: node, instance: prometheus.example:9100}|0|1435781451|
 
-### Range
+#### Range
 
 A range query requires `--start`, `--end` and `--step` arguments:
 
@@ -75,7 +75,7 @@ A range query requires `--start`, `--end` and `--step` arguments:
 |up|{job: prometheus, instance: prometheus.example:9090}|[{value: 1, timestamp: 1435781430}, {value: 1, timestamp: 1435781445} {value: 1, timestamp: 1435781460}]|
 |up|{job: node, instance: prometheus.example:9100}|[{value: 0, timestamp: 1435781430}, {value: 0, timestamp: 1435781445} {value: 1, timestamp: 1435781460}]|
 
-### Flattening labels
+#### Flattening labels
 
 Adding `--flatten` will flatten labels into each row.
 
@@ -93,4 +93,18 @@ Outputs:
 If a metric uses "name" as a label it will overwrite the "name" column.
 
 For a range query the values are not flattened.
+
+### Targets
+
+Retreive prometheus target discovery with:
+
+```nushell
+prometheus targets --url https://prometheus.example:9090/
+```
+
+This retrives targets in either the active or dropped states.  The `any`
+argument alse retrieves both states.
+
+Use `active`, or `dropped` to directly filter active or dropped targets.  This
+will output only the selected state.
 

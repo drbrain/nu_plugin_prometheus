@@ -1,7 +1,9 @@
+use crate::{
+    client::{labeled_error, runtime},
+    query::{matrix_to_value, scalar_to_value, vector_to_value},
+};
 use nu_protocol::{LabeledError, Span, Value};
 use prometheus_http_query::{response::Data, RangeQueryBuilder};
-
-use crate::query::{labeled_error, matrix_to_value, runtime, scalar_to_value, vector_to_value};
 
 pub struct QueryRange {
     query: RangeQueryBuilder,
