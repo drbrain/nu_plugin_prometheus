@@ -23,7 +23,10 @@ impl SimplePluginCommand for TargetsCommand {
                 Some('s'),
             )
             .optional("state", SyntaxShape::String, "Target state filter")
-            .input_output_type(Type::Nothing, Type::table())
+            .input_output_types(vec![
+                (Type::Nothing, Type::record()),
+                (Type::Nothing, Type::table()),
+            ])
     }
 
     fn usage(&self) -> &str {
