@@ -9,7 +9,45 @@ Supports:
 
 ## Usage
 
-### Instant queries
+### Sources
+
+A prometheus plugin can be queried directly with `--url`:
+
+```nushell
+"up" | prometheus query --source https://test.prometheus.example/
+```
+
+Nushell plugin configuration can be used to save configure prometheus sources
+including mTLS.
+
+```nushell
+$env.config.plugins.prometheus = {
+  sources: {
+    prod: {
+      url: "https://prod.prometheus.example/"
+      cert: ( $env.HOME | path join ".config/nu_plugin_prometheus/user.crt" )
+      key: ( $env.HOME | path join ".config/nu_plugin_prometheus/user.pk8.key" )
+      cacert: ( $env.HOME | path join ".config/nu_plugin_prometheus/ca.crt" )
+    }
+  }
+}
+```
+
+The key must be in PKCS#8 format. You can convert a PEM key with:
+
+```nushell
+openssl pkcs8 -topk8 -inform PEM -outform DER -in user.key -out user.pk8.key
+```
+
+Use `--source` or `-s` to use a configured source:
+
+```nushell
+"up" | prometheus query --source prod
+```
+
+## Queries
+
+### Instant
 
 Pipe a prometheus query to `prometheus query` for an instant query:
 
@@ -24,7 +62,7 @@ This will output a table:
 |up|{job: prometheus, instance: prometheus.example:9090}|1|1435781451|
 |up|{job: node, instance: prometheus.example:9100}|0|1435781451|
 
-### Range queries
+### Range
 
 A range query requires `--start`, `--end` and `--step` arguments:
 
@@ -56,26 +94,3 @@ If a metric uses "name" as a label it will overwrite the "name" column.
 
 For a range query the values are not flattened.
 
-### Sources
-
-Nushell plugin configuration can be used to save configure prometheus sources
-including TLS.
-
-```nushell
-$env.config.plugins.prometheus = {
-  sources: {
-    prod: {
-      url: "https://prod.prometheus.example/"
-      cert: ( $env.HOME | path join ".config/nu_plugin_prometheus/user.crt" )
-      key: ( $env.HOME | path join ".config/nu_plugin_prometheus/user.pk8.key" )
-      cacert: ( $env.HOME | path join ".config/nu_plugin_prometheus/ca.crt" )
-    }
-  }
-}
-```
-
-Allows querying with `--source` or `-s`:
-
-```nushell
-"up" | prometheus query --source prod
-```
