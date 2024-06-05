@@ -22,6 +22,12 @@ impl SimplePluginCommand for TargetsCommand {
                 "Prometheus source to query",
                 Some('s'),
             )
+            .named(
+                "url",
+                SyntaxShape::String,
+                "Prometheus source url to query",
+                Some('u'),
+            )
             .optional("state", SyntaxShape::String, "Target state filter")
             .input_output_types(vec![
                 (Type::Nothing, Type::record()),
