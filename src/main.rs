@@ -6,6 +6,7 @@ mod source;
 use client::Client;
 use nu_plugin::{serve_plugin, JsonSerializer};
 use prometheus::Prometheus;
+use query::Query;
 
 fn main() {
     serve_plugin(&Prometheus, JsonSerializer)
