@@ -94,6 +94,16 @@ If a metric uses "name" as a label it will overwrite the "name" column.
 
 For a range query the values are not flattened.
 
+### Label names
+
+Retrieve labels names with:
+
+```nushell
+prometheus labels --url https://prometheus.example:9090/
+```
+
+Labels can be filtered by selector as input, or `--start`, `--end`.
+
 ### Targets
 
 Retreive prometheus target discovery with:

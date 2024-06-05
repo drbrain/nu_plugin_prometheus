@@ -1,8 +1,12 @@
+mod label_names;
+mod labels_builder;
 mod query_builder;
 mod query_instant;
 mod query_range;
 mod targets;
 
+pub use label_names::LabelNames;
+pub use labels_builder::LabelsBuilder;
 use nu_protocol::{LabeledError, Span};
 pub use query_builder::QueryBuilder;
 pub use query_instant::QueryInstant;
