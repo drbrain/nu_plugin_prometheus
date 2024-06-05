@@ -51,7 +51,7 @@ impl SimplePluginCommand for LabelsCommand {
     }
 
     fn usage(&self) -> &str {
-        "Show label names"
+        "Query for label names"
     }
 
     fn run(

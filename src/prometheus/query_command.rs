@@ -39,7 +39,7 @@ impl SimplePluginCommand for QueryCommand {
     }
 
     fn usage(&self) -> &str {
-        "Run an instant prometheus query"
+        "Run an instant query"
     }
 
     fn run(

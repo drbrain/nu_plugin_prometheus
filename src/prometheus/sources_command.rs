@@ -19,7 +19,7 @@ impl SimplePluginCommand for SourcesCommand {
     }
 
     fn usage(&self) -> &str {
-        "List configured prometheus sources"
+        "List configured sources"
     }
 
     fn run(

@@ -51,7 +51,7 @@ impl SimplePluginCommand for QueryRangeCommand {
     }
 
     fn usage(&self) -> &str {
-        "Run a range prometheus query"
+        "Run a range query"
     }
 
     fn run(

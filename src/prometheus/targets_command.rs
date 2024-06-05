@@ -36,7 +36,7 @@ impl SimplePluginCommand for TargetsCommand {
     }
 
     fn usage(&self) -> &str {
-        "Show target discovery state"
+        "Query for target discovery state"
     }
 
     fn run(
