@@ -9,7 +9,8 @@ Supports:
     * Range queryies
     * Target status
     * Label names
-* Saved sources for mutual TLS authentication
+    * Label values
+* Saved sources for convenience or mutual TLS authentication
 
 ## Usage
 
@@ -103,12 +104,36 @@ For a range query the values are not flattened.
 Retrieve labels names with:
 
 ```nushell
-prometheus labels --url https://prometheus.example:9090/
+prometheus label names --url https://prometheus.example:9090/
 ```
 
-Labels can be filtered by selector as input, or `--start`, `--end`.
+Label names can be filtered by selector as input, and by time with `--start`
+and `--end`.
 
-### Targets
+To query "up" label names:
+
+```nushell
+"up" | prometheus label names --url https://prometheus.example:9090/
+```
+
+### Label values
+
+Retrieve labels values with:
+
+```nushell
+"version" | prometheus label values --url https://prometheus.example:9090/
+```
+
+Label values can be filtered by name as input, by time with `--start` and
+`--end`, and by selector as extra arguments.
+
+To query "version" label values for the "postgres" job:
+
+```nushell
+"version" | prometheus label values --url https://prometheus.example:9090/ 'job="postgres"'
+```
+
+## Targets
 
 Retreive prometheus target discovery with:
 

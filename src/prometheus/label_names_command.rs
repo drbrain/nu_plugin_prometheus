@@ -1,22 +1,22 @@
 use crate::{
-    client::{LabelNames, LabelsBuilder},
+    client::{LabelNames, LabelNamesBuilder},
     source::Source,
     Prometheus,
 };
-use nu_plugin::SimplePluginCommand;
-use nu_protocol::{Signature, SyntaxShape, Type};
+use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
+use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
 
 #[derive(Clone, Default)]
-pub struct LabelsCommand;
+pub struct LabelNamesCommand;
 
-impl SimplePluginCommand for LabelsCommand {
+impl SimplePluginCommand for LabelNamesCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
-        "prometheus labels"
+        "prometheus label names"
     }
 
-    fn signature(&self) -> nu_protocol::Signature {
+    fn signature(&self) -> Signature {
         Signature::build(self.name())
             .usage(self.usage())
             .named(
@@ -57,14 +57,14 @@ impl SimplePluginCommand for LabelsCommand {
     fn run(
         &self,
         _plugin: &Self::Plugin,
-        engine: &nu_plugin::EngineInterface,
-        call: &nu_plugin::EvaluatedCall,
-        selectors: &nu_protocol::Value,
-    ) -> Result<nu_protocol::Value, nu_protocol::LabeledError> {
+        engine: &EngineInterface,
+        call: &EvaluatedCall,
+        selectors: &Value,
+    ) -> Result<Value, LabeledError> {
         let span = selectors.span();
         let source = Source::from(call, engine)?;
 
-        let builder = LabelsBuilder::new(source.try_into()?);
+        let builder = LabelNamesBuilder::new(source.try_into()?);
 
         let start = call.get_flag("start")?;
         let end = call.get_flag("end")?;

@@ -1,12 +1,13 @@
+use crate::client::SelectorParser;
 use chrono::{DateTime, FixedOffset};
 use nu_protocol::{LabeledError, Value};
-use prometheus_http_query::{Client, LabelNamesQueryBuilder, Selector};
+use prometheus_http_query::{Client, LabelNamesQueryBuilder};
 
-pub struct LabelsBuilder {
+pub struct LabelNamesBuilder {
     client: Client,
 }
 
-impl LabelsBuilder {
+impl LabelNamesBuilder {
     pub fn new(client: Client) -> Self {
         Self { client }
     }
@@ -23,19 +24,12 @@ impl LabelsBuilder {
 
         let mut builder = match selectors {
             Value::Nothing { .. } => builder,
-            Value::String { val: selector, .. } => {
-                builder.selectors(vec![Selector::new().metric(selector)])
-            }
+            Value::String { .. } => builder.selectors(vec![SelectorParser::parse(selectors)?]),
             Value::List { vals: values, .. } => {
                 let mut selectors = vec![];
 
                 for selector in values {
-                    let Value::String { val: selector, .. } = selector else {
-                        return Err(LabeledError::new("Invalid input type")
-                            .with_label("must be a string", selector.span()));
-                    };
-
-                    selectors.push(Selector::new().metric(selector));
+                    selectors.push(SelectorParser::parse(selector)?);
                 }
 
                 builder.selectors(selectors)

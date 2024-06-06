@@ -1,16 +1,22 @@
 mod label_names;
-mod labels_builder;
+mod label_names_builder;
+mod label_values;
+mod label_values_builder;
 mod query_builder;
 mod query_instant;
 mod query_range;
+mod selector_parser;
 mod targets;
 
 pub use label_names::LabelNames;
-pub use labels_builder::LabelsBuilder;
+pub use label_names_builder::LabelNamesBuilder;
+pub use label_values::LabelValues;
+pub use label_values_builder::LabelValuesBuilder;
 use nu_protocol::{LabeledError, Span};
 pub use query_builder::QueryBuilder;
 pub use query_instant::QueryInstant;
 pub use query_range::QueryRange;
+pub use selector_parser::SelectorParser;
 pub use targets::Targets;
 
 pub trait Client {
