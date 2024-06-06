@@ -23,7 +23,7 @@
 on:
   push:
     tags:
-      - '*'
+      - "v*"
 
 name: Publish
 
@@ -37,60 +37,52 @@ jobs:
       - uses: actions-rust-lang/audit@v1
         name: Audit Rust Dependencies
 
-  build_and_test_linux:
+  test_ubuntu:
     name: Build and Test (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: taiki-e/install-action@nextest
-      - name: 'Build and test'
+      - name: Test
         run: cargo nextest run --workspace --all-features
 
-  build_and_test_windows:
+  test_windows:
     name: Build and Test (Windows)
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - name: Prepare symlink configuration
         run: git config --global core.symlinks true
-
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: taiki-e/install-action@nextest
-      - name: 'Build and test'
+      - name: Test
         run: cargo nextest run --workspace --all-features
 
-  crates_io_publish:
-    name: Publish (crates.io)
+  publish:
+    name: Publish
     needs:
       - audit
       - build_and_test_linux
       - build_and_test_windows
-
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-
-      - name: cargo-release Cache
+      - name: cargo-release cache
         id: cargo_release_cache
         uses: actions/cache@v3
         with:
           path: ~/.cargo/bin/cargo-release
           key: ${{ runner.os }}-cargo-release
-
       - run: cargo install cargo-release
         if: steps.cargo_release_cache.outputs.cache-hit != 'true'
-
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
-
-      - name: "cargo release publish"
+      - name: cargo release publish
         run: |-
           cargo release \
             publish \

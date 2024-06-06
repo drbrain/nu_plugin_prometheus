@@ -1,22 +1,27 @@
+---
 name: test
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  test_ubuntu:
     runs-on: ubuntu-latest
+    steps: &test-steps
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
 
-    steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+  test_windows:
+    runs-on: windows-latest
+    steps: *test-steps
