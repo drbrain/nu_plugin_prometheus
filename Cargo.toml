@@ -19,7 +19,7 @@ chrono = "0.4.38"
 nu-plugin = "0.94.2"
 nu-protocol = { version = "0.94.2", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
-regex = "1.10.4"
+regex = "1.10.5"
 reqwest = { version = "0.12.4", features = [ "native-tls" ] }
 tokio = { version ="1.38.0", features = [ "macros", "rt" ] }
 
