@@ -6,7 +6,7 @@ use crate::{
 use chrono::{DateTime, FixedOffset};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
-use prometheus_http_query::{Client, Selector};
+use prometheus_http_query::Client;
 
 #[derive(Clone, Default)]
 pub struct SeriesCommand;
