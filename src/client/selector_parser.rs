@@ -1,74 +1,155 @@
-use nu_protocol::{LabeledError, Span, Value};
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_till, take_while, take_while1},
+    combinator::{eof, map, recognize},
+    error::context,
+    multi::separated_list0,
+    sequence::{delimited, preceded, terminated, tuple},
+    IResult,
+};
+use nu_protocol::{LabeledError, Value};
 use prometheus_http_query::Selector;
-use regex::Regex;
-use std::sync::OnceLock;
-
-static LABEL_RE: OnceLock<Regex> = OnceLock::new();
-static METRIC_RE: OnceLock<Regex> = OnceLock::new();
 
 pub struct SelectorParser {}
 
 impl SelectorParser {
     pub fn parse(input: &Value) -> Result<Selector, LabeledError> {
         let span = input.span();
-        let parts: Vec<_> = input.as_str()?.splitn(2, '=').collect();
+        let input = input.as_str()?;
 
-        if parts.is_empty() {
-            return Err(LabeledError::new("Invalid selector").with_label("metric not found", span));
-        }
-
-        let selector = if parts.len() == 1 {
-            let input = parts[0];
-            let parts: Vec<_> = input.splitn(2, "!~").collect();
-
-            if parts.len() == 1 {
-                Selector::new().metric(check_metric(parts[0], span)?)
-            } else {
-                let label = check_label(parts[0], span)?;
-                let value = parts[1];
-                Selector::new().regex_ne(label, &value[1..value.len() - 1])
-            }
-        } else {
-            let label = parts[0];
-            let rest = parts[1];
-
-            if label.ends_with('!') {
-                let label = check_label(&label[0..label.len() - 1], span)?;
-
-                Selector::new().ne(label, &rest[1..rest.len() - 1])
-            } else if rest.starts_with('"') {
-                Selector::new().eq(check_label(label, span)?, &rest[1..rest.len() - 1])
-            } else if rest.starts_with('~') {
-                Selector::new().regex_eq(check_label(label, span)?, &rest[2..rest.len() - 1])
-            } else {
-                return Err(LabeledError::new("Invalid selector")
-                    .with_label("invalid metric matcher", span));
-            }
-        };
+        let (_, selector) = selector(input)
+            .map_err(|e| LabeledError::new("invalid selector").with_help(e.to_string()))?;
 
         Ok(selector)
     }
 }
 
-fn check_label(label: &str, span: Span) -> Result<&str, LabeledError> {
-    let label_re = LABEL_RE.get_or_init(|| Regex::new(r#"\A[a-zA-Z_][a-zA-Z0-9_]*\z"#).unwrap());
+fn is_metric_name_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_' || c == ':'
+}
 
-    if label_re.is_match(label) {
-        Ok(label)
-    } else {
-        Err(LabeledError::new("Invalid selector").with_label("invalid label name", span))
+fn is_metric_name_end(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == ':'
+}
+
+#[derive(Debug)]
+enum Operation {
+    Eq,
+    Ne,
+    RegexEq,
+    RegexNe,
+}
+
+impl Operation {
+    fn apply<'a>(self, selector: Selector<'a>, label: &'a str, value: &'a str) -> Selector<'a> {
+        match self {
+            Operation::Eq => selector.eq(label, value),
+            Operation::Ne => selector.ne(label, value),
+            Operation::RegexEq => selector.regex_eq(label, value),
+            Operation::RegexNe => selector.regex_ne(label, value),
+        }
     }
 }
 
-fn check_metric(metric: &str, span: Span) -> Result<&str, LabeledError> {
-    let metric_re =
-        METRIC_RE.get_or_init(|| Regex::new(r#"\A[a-zA-Z_:][a-zA-Z0-9_:]*\z"#).unwrap());
+#[derive(Debug)]
+struct LabelMatcher<'a> {
+    label: &'a str,
+    operation: Operation,
+    value: &'a str,
+}
 
-    if metric_re.is_match(metric) {
-        Ok(metric)
-    } else {
-        Err(LabeledError::new("Invalid selector").with_label("invalid metric name", span))
+impl<'a> LabelMatcher<'a> {
+    fn apply(self, selector: Selector<'a>) -> Selector<'a> {
+        self.operation.apply(selector, self.label, self.value)
     }
+}
+
+fn label(input: &str) -> IResult<&str, LabelMatcher, nom::error::VerboseError<&str>> {
+    context(
+        "label",
+        map(
+            tuple((metric_label, operation, label_value)),
+            |(label, operation, value)| LabelMatcher {
+                label,
+                operation,
+                value,
+            },
+        ),
+    )(input)
+}
+
+fn labels(input: &str) -> IResult<&str, Vec<LabelMatcher>, nom::error::VerboseError<&str>> {
+    context(
+        "labels",
+        delimited(tag("{"), separated_list0(tag(","), label), tag("}")),
+    )(input)
+}
+
+fn label_value(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+    delimited(tag("\""), take_till(|c| c == '"'), tag("\""))(input)
+}
+
+fn metric_label(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+    context(
+        "metric label",
+        recognize(preceded(
+            take_while1(is_metric_name_start),
+            take_while(is_metric_name_end),
+        )),
+    )(input)
+}
+
+fn metric_name(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+    context(
+        "metric name",
+        recognize(preceded(
+            take_while1(|c: char| c.is_alphabetic()),
+            take_while(|c: char| c.is_ascii_alphanumeric()),
+        )),
+    )(input)
+}
+
+fn operation(input: &str) -> IResult<&str, Operation, nom::error::VerboseError<&str>> {
+    context(
+        "operation",
+        alt((
+            map(tag("!="), |_| Operation::Ne),
+            map(tag("=~"), |_| Operation::RegexEq),
+            map(tag("!~"), |_| Operation::RegexNe),
+            map(tag("="), |_| Operation::Eq),
+        )),
+    )(input)
+}
+
+fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&str>> {
+    context(
+        "selector",
+        terminated(
+            alt((
+                map(labels, |labels| {
+                    let mut selector = Selector::new();
+
+                    for label_matcher in labels {
+                        selector = label_matcher.apply(selector);
+                    }
+
+                    selector
+                }),
+                map(label, |label_matcher| label_matcher.apply(Selector::new())),
+                map(tuple((metric_name, labels)), |(metric, labels)| {
+                    let mut selector = Selector::new().metric(metric);
+
+                    for label_matcher in labels {
+                        selector = label_matcher.apply(selector);
+                    }
+
+                    selector
+                }),
+                map(metric_name, |name| Selector::new().metric(name)),
+            )),
+            eof,
+        ),
+    )(input)
 }
 
 #[cfg(test)]
@@ -76,31 +157,6 @@ mod test {
     use super::*;
     use nu_protocol::Span;
     use rstest::rstest;
-
-    #[rstest]
-    #[case("a", true)]
-    #[case("1", false)]
-    #[case("a:", false)]
-    fn check_label(#[case] label: &str, #[case] ok: bool) {
-        assert_eq!(
-            ok,
-            super::check_label(label, Span::unknown()).is_ok(),
-            "label: {label} ok: {ok}"
-        );
-    }
-
-    #[rstest]
-    #[case("a", true)]
-    #[case("1", false)]
-    #[case("a:", true)]
-    #[case("a!", false)]
-    fn check_metric(#[case] metric: &str, #[case] ok: bool) {
-        assert_eq!(
-            ok,
-            super::check_metric(metric, Span::unknown()).is_ok(),
-            "metric: {metric} ok: {ok}"
-        );
-    }
 
     #[test]
     fn eq() {
@@ -126,6 +182,20 @@ mod test {
         assert_eq!(Selector::new().ne("label", "value"), metric);
     }
 
+    #[rstest]
+    #[case("up", Selector::new().metric("up"))]
+    #[case(r#"job="prometheus""#, Selector::new().eq("job", "prometheus"))]
+    #[case(r#"job!="prometheus""#, Selector::new().ne("job", "prometheus"))]
+    #[case(r#"job=~"p.+""#, Selector::new().regex_eq("job", "p.+"))]
+    #[case(r#"job!~"p.+""#, Selector::new().regex_ne("job", "p.+"))]
+    #[case(r#"up{job="prometheus"}"#, Selector::new().metric("up").eq("job", "prometheus"))]
+    fn parse(#[case] input: &str, #[case] expected: Selector) {
+        let value = Value::string(input, Span::unknown());
+
+        let parsed = SelectorParser::parse(&value).unwrap();
+
+        assert_eq!(expected, parsed, "input: {input} parsed: {parsed}");
+    }
     #[test]
     fn regex_eq() {
         let input = Value::string(r#"label=~"value""#, Span::unknown());

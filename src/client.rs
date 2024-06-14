@@ -6,6 +6,7 @@ mod query_builder;
 mod query_instant;
 mod query_range;
 mod selector_parser;
+mod series;
 mod targets;
 
 pub use label_names::LabelNames;
@@ -17,6 +18,7 @@ pub use query_builder::QueryBuilder;
 pub use query_instant::QueryInstant;
 pub use query_range::QueryRange;
 pub use selector_parser::SelectorParser;
+pub use series::Series;
 pub use targets::Targets;
 
 pub trait Client {

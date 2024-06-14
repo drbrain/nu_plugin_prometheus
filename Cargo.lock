@@ -1232,6 +1232,7 @@ name = "nu_plugin_prometheus"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "nom",
  "nu-plugin",
  "nu-protocol",
  "prometheus-http-query",
