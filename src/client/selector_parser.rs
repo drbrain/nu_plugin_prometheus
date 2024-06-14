@@ -1,8 +1,8 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_while, take_while1},
-    combinator::{eof, map, recognize},
-    error::context,
+    combinator::{complete, eof, map, recognize},
+    error::{context, convert_error},
     multi::separated_list0,
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
@@ -17,8 +17,16 @@ impl SelectorParser {
         let span = input.span();
         let input = input.as_str()?;
 
-        let (_, selector) = selector(input)
-            .map_err(|e| LabeledError::new("invalid selector").with_help(e.to_string()))?;
+        let (_, selector) = selector(input).map_err(|e| {
+            let mut error = LabeledError::new("Selector parse error").with_label("selector", span);
+
+            if let nom::Err::Error(e) = e {
+                let trace = convert_error(input, e);
+                error = error.with_help(trace);
+            }
+
+            error
+        })?;
 
         Ok(selector)
     }
@@ -134,7 +142,7 @@ fn operation(input: &str) -> IResult<&str, Operation, nom::error::VerboseError<&
 fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&str>> {
     context(
         "selector",
-        terminated(
+        complete(terminated(
             alt((
                 map(labels, |labels| {
                     let mut selector = Selector::new();
@@ -158,7 +166,7 @@ fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&st
                 map(metric_name, |name| Selector::new().metric(name)),
             )),
             eof,
-        ),
+        )),
     )(input)
 }
 
