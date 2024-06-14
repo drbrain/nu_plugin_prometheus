@@ -24,6 +24,14 @@ impl SelectorParser {
     }
 }
 
+fn is_metric_label_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+
+fn is_metric_label_end(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
+}
+
 fn is_metric_name_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_' || c == ':'
 }
@@ -89,22 +97,24 @@ fn label_value(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str
     delimited(tag("\""), take_till(|c| c == '"'), tag("\""))(input)
 }
 
+/// Matches a metric name `[a-zA-Z_][a-zA-Z0-9_]*`
 fn metric_label(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
     context(
         "metric label",
         recognize(preceded(
-            take_while1(is_metric_name_start),
-            take_while(is_metric_name_end),
+            take_while1(is_metric_label_start),
+            take_while(is_metric_label_end),
         )),
     )(input)
 }
 
+/// Matches a metric name `[a-zA-Z_:][a-zA-Z0-9_:]*`
 fn metric_name(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
     context(
         "metric name",
         recognize(preceded(
-            take_while1(|c: char| c.is_alphabetic()),
-            take_while(|c: char| c.is_ascii_alphanumeric()),
+            take_while1(is_metric_name_start),
+            take_while(is_metric_name_end),
         )),
     )(input)
 }
@@ -155,6 +165,7 @@ fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&st
 #[cfg(test)]
 mod test {
     use super::*;
+    use nom::error::VerboseErrorKind;
     use nu_protocol::Span;
     use rstest::rstest;
 
@@ -172,6 +183,92 @@ mod test {
         let metric = SelectorParser::parse(&input).unwrap();
 
         assert_eq!(Selector::new().metric("metric"), metric);
+    }
+
+    #[test]
+    fn metric_label_error() {
+        let input = "0";
+
+        let Err(nom::Err::Error(error)) = metric_label(input) else {
+            unreachable!("input {input} must error");
+        };
+
+        let (error_input, VerboseErrorKind::Context(kind)) = error.errors.last().unwrap() else {
+            unreachable!("error kind mismatch for {error:?}");
+        };
+
+        assert_eq!(&"0", error_input);
+        assert_eq!(&"metric label", kind);
+    }
+
+    #[rstest]
+    #[case("A0", "", "A0")]
+    #[case("__name__", "", "__name__")]
+    #[case("a0", "", "a0")]
+    #[case("name_0_more", "", "name_0_more")]
+    #[case("rule:name", ":name", "rule")]
+    #[case("up", "", "up")]
+    #[case("up{", "{", "up")]
+    fn metric_label_ok(
+        #[case] input: &str,
+        #[case] expected_rest: &str,
+        #[case] expected_parsed: &str,
+    ) {
+        let Ok((rest, parsed)) = metric_label(input) else {
+            unreachable!("Unable to parse valid input {input}");
+        };
+
+        assert_eq!(
+            expected_parsed, parsed,
+            "parsed mismatch, expected {expected_parsed} got {parsed}"
+        );
+        assert_eq!(
+            expected_rest, rest,
+            "rest mismatch, expected {expected_rest} got {rest}"
+        );
+    }
+
+    #[test]
+    fn metric_name_error() {
+        let input = "0";
+
+        let Err(nom::Err::Error(error)) = metric_name(input) else {
+            unreachable!("input {input} must error");
+        };
+
+        let (error_input, VerboseErrorKind::Context(kind)) = error.errors.last().unwrap() else {
+            unreachable!("error kind mismatch for {error:?}");
+        };
+
+        assert_eq!(&"0", error_input);
+        assert_eq!(&"metric name", kind);
+    }
+
+    #[rstest]
+    #[case("A0", "", "A0")]
+    #[case("__name__", "", "__name__")]
+    #[case("a0", "", "a0")]
+    #[case("name_0_more", "", "name_0_more")]
+    #[case("rule:name", "", "rule:name")]
+    #[case("up", "", "up")]
+    #[case("up{", "{", "up")]
+    fn metric_name_ok(
+        #[case] input: &str,
+        #[case] expected_rest: &str,
+        #[case] expected_parsed: &str,
+    ) {
+        let Ok((rest, parsed)) = metric_name(input) else {
+            unreachable!("Unable to parse valid input {input}");
+        };
+
+        assert_eq!(
+            expected_parsed, parsed,
+            "parsed mismatch, expected {expected_parsed} got {parsed}"
+        );
+        assert_eq!(
+            expected_rest, rest,
+            "rest mismatch, expected {expected_rest} got {rest}"
+        );
     }
 
     #[test]
