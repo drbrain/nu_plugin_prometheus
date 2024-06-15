@@ -1,7 +1,6 @@
 use crate::{
     client::{SelectorParser, Series},
-    source::Source,
-    Prometheus,
+    Prometheus, Source,
 };
 use chrono::{DateTime, FixedOffset};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};

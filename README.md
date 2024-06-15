@@ -134,6 +134,18 @@ To query "version" label values for the "postgres" job:
 "version" | prometheus label values --url https://prometheus.example:9090/ 'job="postgres"'
 ```
 
+### Metric metadata
+
+Retrieve metric metadata with:
+
+```nushell
+prometheus metric metadata --url https://prometheus.example:9090/
+```
+
+This may take some time, so supply a metric name as input or supply `--limit`
+to reduce the number of records retrieved.  Use `--limit-per-metric` to reduce
+the number of metadata items retrieved per metric.
+
 ## Series
 
 Retrieve series matching the given label set with:
