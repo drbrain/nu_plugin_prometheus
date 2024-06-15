@@ -8,6 +8,7 @@ Supports:
     * Instant queries
     * Range queryies
     * Target status
+    * Series
     * Label names
     * Label values
 * Saved sources for convenience or mutual TLS authentication
@@ -132,6 +133,18 @@ To query "version" label values for the "postgres" job:
 ```nushell
 "version" | prometheus label values --url https://prometheus.example:9090/ 'job="postgres"'
 ```
+
+## Series
+
+Retrieve series matching the given label set with:
+
+```nushell
+[up process_start_time_seconds{job="prometheus"}] |
+prometheus series -s home
+```
+
+Series are retrieved using a selector given as input.  Series retrived may be
+filtered by time with `--start` and `--end`.
 
 ## Targets
 
