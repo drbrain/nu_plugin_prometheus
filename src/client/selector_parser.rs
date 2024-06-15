@@ -2,12 +2,12 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_while, take_while1},
     combinator::{complete, eof, map, recognize},
-    error::{context, convert_error},
+    error::{context, VerboseError, VerboseErrorKind},
     multi::separated_list0,
     sequence::{delimited, preceded, terminated, tuple},
-    IResult,
+    IResult, Offset,
 };
-use nu_protocol::{LabeledError, Value};
+use nu_protocol::{LabeledError, Span, Value};
 use prometheus_http_query::Selector;
 
 pub struct SelectorParser {}
@@ -17,19 +17,59 @@ impl SelectorParser {
         let span = input.span();
         let input = input.as_str()?;
 
-        let (_, selector) = selector(input).map_err(|e| {
-            let mut error = LabeledError::new("Selector parse error").with_label("selector", span);
-
-            if let nom::Err::Error(e) = e {
-                let trace = convert_error(input, e);
-                error = error.with_help(trace);
+        let (_, selector) = selector(input).map_err(|error| {
+            if let nom::Err::Error(error) = error {
+                nom_error_to_nu_error(input, error, span)
+            } else {
+                LabeledError::new("Selector parse error").with_label("selector", span)
             }
-
-            error
         })?;
 
         Ok(selector)
     }
+}
+
+fn nom_error_to_nu_error(input: &str, error: VerboseError<&str>, span: Span) -> LabeledError {
+    let mut result = LabeledError::new("Selector parse error");
+
+    for (substring, kind) in error.errors.iter() {
+        let offset = input.offset(substring);
+        let start = span.start + offset;
+        let end = start + substring.len();
+        let span = Span::new(start, end);
+
+        if input.is_empty() {
+            match kind {
+                VerboseErrorKind::Char(c) => {
+                    result = result.with_label(format!("expected {c}, got empty input"), span);
+                }
+                VerboseErrorKind::Context(s) => {
+                    result = result.with_label(format!("in {s}, got empty input"), span);
+                }
+                VerboseErrorKind::Nom(e) => {
+                    result = result.with_label(format!("in {e:?}, got empty input"), span);
+                }
+            }
+        } else {
+            match kind {
+                VerboseErrorKind::Char(expected) => {
+                    let label = if let Some(actual) = substring.chars().next() {
+                        format!("expected '{expected}', found {actual}")
+                    } else {
+                        format!("expected '{expected}', got end of input")
+                    };
+
+                    result = result.with_label(label, span)
+                }
+                VerboseErrorKind::Context(context) => {
+                    result = result.with_label(format!("in {context}"), span)
+                }
+                VerboseErrorKind::Nom(e) => result = result.with_label(format!("in {e:?}"), span),
+            }
+        }
+    }
+
+    result
 }
 
 fn is_metric_label_start(c: char) -> bool {
@@ -80,7 +120,7 @@ impl<'a> LabelMatcher<'a> {
     }
 }
 
-fn label(input: &str) -> IResult<&str, LabelMatcher, nom::error::VerboseError<&str>> {
+fn label(input: &str) -> IResult<&str, LabelMatcher, VerboseError<&str>> {
     context(
         "label",
         map(
@@ -94,19 +134,19 @@ fn label(input: &str) -> IResult<&str, LabelMatcher, nom::error::VerboseError<&s
     )(input)
 }
 
-fn labels(input: &str) -> IResult<&str, Vec<LabelMatcher>, nom::error::VerboseError<&str>> {
+fn labels(input: &str) -> IResult<&str, Vec<LabelMatcher>, VerboseError<&str>> {
     context(
         "labels",
         delimited(tag("{"), separated_list0(tag(","), label), tag("}")),
     )(input)
 }
 
-fn label_value(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+fn label_value(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     delimited(tag("\""), take_till(|c| c == '"'), tag("\""))(input)
 }
 
 /// Matches a metric name `[a-zA-Z_][a-zA-Z0-9_]*`
-fn metric_label(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+fn metric_label(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     context(
         "metric label",
         recognize(preceded(
@@ -117,7 +157,7 @@ fn metric_label(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&st
 }
 
 /// Matches a metric name `[a-zA-Z_:][a-zA-Z0-9_:]*`
-fn metric_name(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str>> {
+fn metric_name(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     context(
         "metric name",
         recognize(preceded(
@@ -127,7 +167,7 @@ fn metric_name(input: &str) -> IResult<&str, &str, nom::error::VerboseError<&str
     )(input)
 }
 
-fn operation(input: &str) -> IResult<&str, Operation, nom::error::VerboseError<&str>> {
+fn operation(input: &str) -> IResult<&str, Operation, VerboseError<&str>> {
     context(
         "operation",
         alt((
@@ -139,7 +179,7 @@ fn operation(input: &str) -> IResult<&str, Operation, nom::error::VerboseError<&
     )(input)
 }
 
-fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&str>> {
+fn selector(input: &str) -> IResult<&str, Selector, VerboseError<&str>> {
     context(
         "selector",
         complete(terminated(
@@ -174,7 +214,10 @@ fn selector(input: &str) -> IResult<&str, Selector, nom::error::VerboseError<&st
 mod test {
     use super::*;
     use nom::error::VerboseErrorKind;
-    use nu_protocol::Span;
+    use nu_protocol::{
+        engine::{EngineState, StateWorkingSet},
+        Span,
+    };
     use rstest::rstest;
 
     #[test]
@@ -294,6 +337,7 @@ mod test {
     #[case(r#"job=~"p.+""#, Selector::new().regex_eq("job", "p.+"))]
     #[case(r#"job!~"p.+""#, Selector::new().regex_ne("job", "p.+"))]
     #[case(r#"up{job="prometheus"}"#, Selector::new().metric("up").eq("job", "prometheus"))]
+    #[case(r#"up{job="☃"}"#, Selector::new().metric("up").eq("job", "☃"))]
     fn parse(#[case] input: &str, #[case] expected: Selector) {
         let value = Value::string(input, Span::unknown());
 
@@ -301,6 +345,31 @@ mod test {
 
         assert_eq!(expected, parsed, "input: {input} parsed: {parsed}");
     }
+
+    #[rstest]
+    #[case(r#"up{job="☃"} junk"#, vec![(13, 18), (0, 18)])]
+    #[case(r#"0a"#, vec![(0, 2), (0, 2), (0, 2), (0, 2)])]
+    fn parse_error(#[case] input: &str, #[case] spans: Vec<(usize, usize)>) {
+        let engine = EngineState::default();
+        let mut working_set = StateWorkingSet::new(&engine);
+
+        let file_id = working_set.add_file("input".into(), input.as_bytes());
+        let span = working_set.get_span_for_file(file_id);
+
+        let value = Value::string(input, span);
+
+        let error = SelectorParser::parse(&value).err().unwrap();
+
+        for ((start, end), label) in spans.iter().zip(error.labels) {
+            assert_eq!(
+                Span::new(*start, *end),
+                label.span,
+                "span mismatch for label {}",
+                label.text
+            );
+        }
+    }
+
     #[test]
     fn regex_eq() {
         let input = Value::string(r#"label=~"value""#, Span::unknown());
