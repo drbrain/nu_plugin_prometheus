@@ -1236,7 +1236,6 @@ dependencies = [
  "nu-plugin",
  "nu-protocol",
  "prometheus-http-query",
- "regex",
  "reqwest",
  "rstest",
  "serde",
