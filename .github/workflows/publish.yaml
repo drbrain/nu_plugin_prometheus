@@ -65,8 +65,8 @@ jobs:
     name: Publish
     needs:
       - audit
-      - build_and_test_linux
-      - build_and_test_windows
+      - test_ubuntu
+      - test_windows
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
