@@ -30,7 +30,11 @@ impl SelectorParser {
 }
 
 fn nom_error_to_nu_error(input: &str, error: VerboseError<&str>, span: Span) -> LabeledError {
-    let mut result = LabeledError::new("Selector parse error");
+    let mut result = LabeledError::new("Selector parse error")
+        .with_help("Must be a Prometheus vector instant selector.")
+        .with_url(
+            "https://prometheus.io/docs/prometheus/latest/querying/basics/#instant-vector-selectors",
+        );
 
     for (substring, kind) in error.errors.iter() {
         let offset = input.offset(substring);
