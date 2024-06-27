@@ -34,4 +34,8 @@ impl Plugin for Prometheus {
             Box::new(TargetsCommand),
         ]
     }
+
+    fn version(&self) -> String {
+        env!("CARGO_PKG_VERSION").into()
+    }
 }
