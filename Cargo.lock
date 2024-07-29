@@ -440,6 +440,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -447,6 +456,18 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -1130,22 +1151,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "nu-engine"
-version = "0.95.0"
+name = "nu-derive-value"
+version = "0.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5ed7cd7d34dd3e58292eaaa658f4b7342da99e979da54babd50c08d5d6d59e5"
+checksum = "39aca8fcc17ec138e693197f46d6363da7a2adb9d219e8d62bb35c40c54e13ad"
 dependencies = [
+ "convert_case",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.65",
+]
+
+[[package]]
+name = "nu-engine"
+version = "0.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e206d38658012a1061841adb97183586d774ec75962b434d7479ee47d5faab70"
+dependencies = [
+ "log",
  "nu-glob",
- "nu-path",
- "nu-protocol",
- "nu-utils",
+ "nu-path 0.96.0",
+ "nu-protocol 0.96.0",
+ "nu-utils 0.96.0",
 ]
 
 [[package]]
 name = "nu-glob"
-version = "0.95.0"
+version = "0.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acd2879444c53bbfb51a2ab060ae1257fe2c8446e6b2cd8a63c88a4d6a728a7a"
+checksum = "6e9bc4d3b40883771d53259c782cf0eacf43b5e1c9ccea6f950bd308efd17bec"
 
 [[package]]
 name = "nu-path"
@@ -1159,30 +1194,42 @@ dependencies = [
 ]
 
 [[package]]
-name = "nu-plugin"
-version = "0.95.0"
+name = "nu-path"
+version = "0.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7844c84c9319c0dc831bc6d595990dee2ba66aab9d0a0d4d64ab414e6520b0f"
+checksum = "a16d6545959685d795e7c8b35d25887d200765dd08e37cbcd16f793bc4ba32f2"
+dependencies = [
+ "dirs",
+ "omnipath",
+ "pwd",
+]
+
+[[package]]
+name = "nu-plugin"
+version = "0.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcb9fe868e08a113e15a9b32b4fbcaddb0b2b07a9da234d23d6baceec49c9f8d"
 dependencies = [
  "log",
  "nix",
  "nu-engine",
  "nu-plugin-core",
  "nu-plugin-protocol",
- "nu-protocol",
+ "nu-protocol 0.96.0",
+ "nu-utils 0.96.0",
  "thiserror",
 ]
 
 [[package]]
 name = "nu-plugin-core"
-version = "0.95.0"
+version = "0.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b400723e072a53a1ddff07f530758b17df97cb8bf632414c547a1ad2c1225ddb"
+checksum = "1d5b7396b142933d419a52d8bf9fd3eb6ea2f6e9acbea9ddda0341494db027b1"
 dependencies = [
  "interprocess",
  "log",
  "nu-plugin-protocol",
- "nu-protocol",
+ "nu-protocol 0.96.0",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -1191,13 +1238,13 @@ dependencies = [
 
 [[package]]
 name = "nu-plugin-protocol"
-version = "0.95.0"
+version = "0.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "257069f3d77a7fbe47685deb3a53d2de4a4744f6869a7f977286dbadd8bdb2aa"
+checksum = "4502f7f8170cdcbbbe1c82c2f900405a037b7ebfb958bbffe855151d457649e4"
 dependencies = [
  "bincode",
- "nu-protocol",
- "nu-utils",
+ "nu-protocol 0.96.0",
+ "nu-utils 0.96.0",
  "semver",
  "serde",
  "typetag",
@@ -1219,10 +1266,10 @@ dependencies = [
  "lru",
  "miette",
  "nix",
- "nu-derive-value",
- "nu-path",
- "nu-system",
- "nu-utils",
+ "nu-derive-value 0.95.0",
+ "nu-path 0.95.0",
+ "nu-system 0.95.0",
+ "nu-utils 0.95.0",
  "num-format",
  "os_pipe",
  "rmp-serde",
@@ -1232,10 +1279,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "nu-protocol"
+version = "0.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8e963e33b9f2029e992eb9a77efe3e3e266c831ba59d1c485d34de0cc941526"
+dependencies = [
+ "brotli",
+ "byte-unit",
+ "chrono",
+ "chrono-humanize",
+ "convert_case",
+ "dirs",
+ "dirs-sys",
+ "fancy-regex",
+ "indexmap",
+ "log",
+ "lru",
+ "miette",
+ "nix",
+ "nu-derive-value 0.96.0",
+ "nu-path 0.96.0",
+ "nu-system 0.96.0",
+ "nu-utils 0.96.0",
+ "num-format",
+ "os_pipe",
+ "rmp-serde",
+ "serde",
+ "thiserror",
+ "typetag",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "nu-system"
 version = "0.95.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c5e86b4e9ea84b4b12778a159adbbef5f4346213dcc4e9e58f3c40f5c9865af"
+dependencies = [
+ "chrono",
+ "itertools",
+ "libc",
+ "libproc",
+ "log",
+ "mach2",
+ "nix",
+ "ntapi",
+ "once_cell",
+ "procfs",
+ "sysinfo",
+ "windows 0.54.0",
+]
+
+[[package]]
+name = "nu-system"
+version = "0.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c22329ae7e604736901c4030e7f78543de2883e35f7fd4ea9718232d4c654360"
 dependencies = [
  "chrono",
  "itertools",
@@ -1269,13 +1368,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "nu-utils"
+version = "0.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a01575a81aee1b5fd4a86c011920ca3d65d0c1d39e6352b5bb4c0d61d2fb6c"
+dependencies = [
+ "crossterm_winapi",
+ "log",
+ "lscolors",
+ "nix",
+ "num-format",
+ "serde",
+ "strip-ansi-escapes",
+ "sys-locale",
+ "unicase",
+]
+
+[[package]]
 name = "nu_plugin_prometheus"
 version = "0.3.0"
 dependencies = [
  "chrono",
  "nom",
  "nu-plugin",
- "nu-protocol",
+ "nu-protocol 0.95.0",
  "prometheus-http-query",
  "reqwest",
  "rstest",
@@ -1367,6 +1483,12 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "option-ext"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "os_pipe"
