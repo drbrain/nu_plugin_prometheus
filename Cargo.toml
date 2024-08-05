@@ -17,7 +17,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 chrono = "0.4.38"
 nom = "7.1.3"
-nu-plugin = "0.95.0"
+nu-plugin = "0.96.1"
 nu-protocol = { version = "0.95.0", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
 reqwest = { version = "0.12.5", features = [ "native-tls" ] }
