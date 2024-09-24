@@ -21,7 +21,7 @@ nu-plugin = "0.96.1"
 nu-protocol = { version = "0.96.1", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
 reqwest = { version = "0.12.5", features = [ "native-tls" ] }
-tokio = { version ="1.39.2", features = [ "macros", "rt" ] }
+tokio = { version ="1.40.0", features = [ "macros", "rt" ] }
 
 [dev-dependencies]
 rstest = { version = "0.22", default-features = false }
