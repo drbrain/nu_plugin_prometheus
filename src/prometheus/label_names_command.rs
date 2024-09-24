@@ -18,7 +18,7 @@ impl SimplePluginCommand for LabelNamesCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "start",
                 SyntaxShape::DateTime,
@@ -50,7 +50,7 @@ impl SimplePluginCommand for LabelNamesCommand {
             ])
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Query for label names"
     }
 

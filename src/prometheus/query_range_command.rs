@@ -14,7 +14,7 @@ impl SimplePluginCommand for QueryRangeCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "start",
                 SyntaxShape::DateTime,
@@ -50,7 +50,7 @@ impl SimplePluginCommand for QueryRangeCommand {
             .input_output_type(Type::String, Type::Any)
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Run a range query"
     }
 

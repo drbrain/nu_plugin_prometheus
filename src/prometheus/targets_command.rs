@@ -15,7 +15,7 @@ impl SimplePluginCommand for TargetsCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "source",
                 SyntaxShape::String,
@@ -35,7 +35,7 @@ impl SimplePluginCommand for TargetsCommand {
             ])
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Query for target discovery state"
     }
 

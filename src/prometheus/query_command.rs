@@ -14,7 +14,7 @@ impl SimplePluginCommand for QueryCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "at",
                 SyntaxShape::DateTime,
@@ -38,7 +38,7 @@ impl SimplePluginCommand for QueryCommand {
             .input_output_type(Type::String, Type::Any)
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Run an instant query"
     }
 

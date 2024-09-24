@@ -14,11 +14,11 @@ impl SimplePluginCommand for SourcesCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .input_output_type(Type::Nothing, Type::table())
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "List configured sources"
     }
 

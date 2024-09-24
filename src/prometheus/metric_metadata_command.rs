@@ -15,7 +15,7 @@ impl SimplePluginCommand for MetricMetadataCommand {
 
     fn signature(&self) -> nu_protocol::Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "source",
                 SyntaxShape::String,
@@ -46,7 +46,7 @@ impl SimplePluginCommand for MetricMetadataCommand {
             ])
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Retrieve metric metadata"
     }
 

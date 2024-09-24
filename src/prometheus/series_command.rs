@@ -19,7 +19,7 @@ impl SimplePluginCommand for SeriesCommand {
 
     fn signature(&self) -> Signature {
         Signature::build(self.name())
-            .usage(self.usage())
+            .description(self.description())
             .named(
                 "source",
                 SyntaxShape::String,
@@ -43,7 +43,7 @@ impl SimplePluginCommand for SeriesCommand {
             ])
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Query for series"
     }
 

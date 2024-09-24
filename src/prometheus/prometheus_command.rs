@@ -16,7 +16,7 @@ impl SimplePluginCommand for PrometheusCommand {
         Signature::build(self.name()).input_output_type(Type::Nothing, Type::Nothing)
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Prometheus plugin"
     }
 
