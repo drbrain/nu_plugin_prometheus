@@ -219,10 +219,10 @@ mod test {
 
         let result = query.scalar_to_value(&scalar).into_record().unwrap();
 
-        assert_eq!(1.0, result.get("value").unwrap().as_f64().unwrap());
+        assert_eq!(1.0, result.get("value").unwrap().as_float().unwrap());
         assert_eq!(
             1716956024,
-            result.get("timestamp").unwrap().as_f64().unwrap() as u64
+            result.get("timestamp").unwrap().as_float().unwrap() as u64
         );
     }
 
@@ -243,11 +243,11 @@ mod test {
 
         assert_eq!("job name", labels.get("job").unwrap().as_str().unwrap());
 
-        let value = record.get("value").unwrap().as_f64().unwrap();
+        let value = record.get("value").unwrap().as_float().unwrap();
 
         assert_eq!(1.0, value);
 
-        let timestamp = record.get("timestamp").unwrap().as_f64().unwrap();
+        let timestamp = record.get("timestamp").unwrap().as_float().unwrap();
 
         assert_eq!(1716956024, timestamp as u64);
     }
