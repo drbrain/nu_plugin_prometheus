@@ -1,9 +1,11 @@
 mod label_names_command;
 mod label_values_command;
 mod metric_metadata_command;
+mod parse_command;
 mod prometheus_command;
 mod query_command;
 mod query_range_command;
+mod scrape_command;
 mod series_command;
 mod sources_command;
 mod targets_command;
@@ -16,6 +18,8 @@ use crate::prometheus::{
     targets_command::TargetsCommand,
 };
 use nu_plugin::Plugin;
+use parse_command::ParseCommand;
+use scrape_command::ScrapeCommand;
 
 #[derive(Clone)]
 pub struct Prometheus;
@@ -26,10 +30,12 @@ impl Plugin for Prometheus {
             Box::new(LabelNamesCommand),
             Box::new(LabelValuesCommand),
             Box::new(MetricMetadataCommand),
+            Box::new(ParseCommand),
             Box::new(PrometheusCommand),
             Box::new(QueryCommand),
             Box::new(QueryRangeCommand),
             Box::new(SeriesCommand),
+            Box::new(ScrapeCommand),
             Box::new(SourcesCommand),
             Box::new(TargetsCommand),
         ]
