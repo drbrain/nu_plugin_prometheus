@@ -2,11 +2,12 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_while, take_while1},
     combinator::{complete, eof, map, recognize},
-    error::{context, VerboseError, VerboseErrorKind},
+    error::context,
     multi::separated_list0,
-    sequence::{delimited, preceded, terminated, tuple},
-    IResult, Offset,
+    sequence::{delimited, preceded, terminated},
+    IResult, Offset, Parser,
 };
+use nom_language::error::{VerboseError, VerboseErrorKind};
 use nu_protocol::{LabeledError, Span, Value};
 use prometheus_http_query::Selector;
 
@@ -128,25 +129,27 @@ fn label(input: &str) -> IResult<&str, LabelMatcher, VerboseError<&str>> {
     context(
         "label",
         map(
-            tuple((metric_label, operation, label_value)),
+            (metric_label, operation, label_value),
             |(label, operation, value)| LabelMatcher {
                 label,
                 operation,
                 value,
             },
         ),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn labels(input: &str) -> IResult<&str, Vec<LabelMatcher>, VerboseError<&str>> {
     context(
         "labels",
         delimited(tag("{"), separated_list0(tag(","), label), tag("}")),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn label_value(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    delimited(tag("\""), take_till(|c| c == '"'), tag("\""))(input)
+    delimited(tag("\""), take_till(|c| c == '"'), tag("\"")).parse(input)
 }
 
 /// Matches a metric name `[a-zA-Z_][a-zA-Z0-9_]*`
@@ -157,7 +160,8 @@ fn metric_label(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
             take_while1(is_metric_label_start),
             take_while(is_metric_label_end),
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Matches a metric name `[a-zA-Z_:][a-zA-Z0-9_:]*`
@@ -168,7 +172,8 @@ fn metric_name(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
             take_while1(is_metric_name_start),
             take_while(is_metric_name_end),
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn operation(input: &str) -> IResult<&str, Operation, VerboseError<&str>> {
@@ -180,7 +185,8 @@ fn operation(input: &str) -> IResult<&str, Operation, VerboseError<&str>> {
             map(tag("!~"), |_| Operation::RegexNe),
             map(tag("="), |_| Operation::Eq),
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn selector(input: &str) -> IResult<&str, Selector, VerboseError<&str>> {
@@ -198,7 +204,7 @@ fn selector(input: &str) -> IResult<&str, Selector, VerboseError<&str>> {
                     selector
                 }),
                 map(label, |label_matcher| label_matcher.apply(Selector::new())),
-                map(tuple((metric_name, labels)), |(metric, labels)| {
+                map((metric_name, labels), |(metric, labels)| {
                     let mut selector = Selector::new().metric(metric);
 
                     for label_matcher in labels {
@@ -211,13 +217,14 @@ fn selector(input: &str) -> IResult<&str, Selector, VerboseError<&str>> {
             )),
             eof,
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use nom::error::VerboseErrorKind;
+    use nom_language::error::VerboseErrorKind;
     use nu_protocol::{
         engine::{EngineState, StateWorkingSet},
         Span,
