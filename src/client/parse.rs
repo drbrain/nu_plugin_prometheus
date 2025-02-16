@@ -1,6 +1,6 @@
 use crate::Client;
 use nom_openmetrics::{
-    parser::{exposition, prometheus},
+    parser::{openmetrics, prometheus},
     Family, MetricDescriptor, Sample,
 };
 use nu_protocol::{record, LabeledError, Record, Span, Value};
@@ -30,7 +30,7 @@ impl<'a> Parse<'a> {
 
         let (_, families) = match format {
             ParseFormat::Prometheus => prometheus(input.as_str()?).unwrap(),
-            ParseFormat::Openmetrics => exposition(input.as_str()?).unwrap(),
+            ParseFormat::Openmetrics => openmetrics(input.as_str()?).unwrap(),
         };
 
         let families = families
