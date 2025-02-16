@@ -364,7 +364,7 @@ mod test {
 
         let error = SelectorParser::parse(&value).err().unwrap();
 
-        for ((start, end), label) in spans.iter().zip(error.labels) {
+        for ((start, end), label) in spans.iter().zip(error.labels.iter()) {
             assert_eq!(
                 Span::new(*start, *end),
                 label.span,
