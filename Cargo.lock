@@ -1199,7 +1199,7 @@ dependencies = [
 [[package]]
 name = "nom-openmetrics"
 version = "0.1.0"
-source = "git+https://github.com/drbrain/nom-openmetrics#5a8cfe0cd290ef85a4dc30464f9ef3b131165091"
+source = "git+https://github.com/drbrain/nom-openmetrics#4a58ab8003b08f89c1d3b73d708227f03be84be2"
 dependencies = [
  "nom 8.0.0",
  "nom-language",
