@@ -3,7 +3,7 @@
 A nushell plugin for querying prometheus
 
 Supports:
-* nushell 0.102.0
+* nushell 0.104.0
 * Prometheus API
     * Instant queries
     * Range queryies
@@ -12,6 +12,8 @@ Supports:
     * Label names
     * Label values
 * Saved sources for convenience or mutual TLS authentication
+* Parsing Prometheus output
+* Scraping Prometheus targets
 
 ## Usage
 
@@ -171,4 +173,20 @@ argument alse retrieves both states.
 
 Use `active`, or `dropped` to directly filter active or dropped targets.  This
 will output only the selected state.
+
+## Scraping
+
+Scrape a prometheus target with:
+
+```nushell
+"https://target.example:1234/metrics" | prometheus scrape
+```
+
+## Parsing
+
+Parse text prometheus output with:
+
+```nushell
+open saved.metrics | prometheus parse
+```
 
