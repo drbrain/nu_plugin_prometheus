@@ -22,7 +22,7 @@ nom-openmetrics = { git = "https://github.com/drbrain/nom-openmetrics" }
 nu-plugin = "0.102.0"
 nu-protocol = { version = "0.102.0", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
-reqwest = { version = "0.12.5", features = [ "native-tls" ] }
+reqwest = { version = "0.12.15", features = [ "native-tls" ] }
 tokio = { version ="1.44.2", features = [ "macros", "rt" ] }
 
 [dev-dependencies]
