@@ -443,7 +443,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1191,8 +1191,9 @@ dependencies = [
 
 [[package]]
 name = "nom-openmetrics"
-version = "0.1.0"
-source = "git+https://github.com/drbrain/nom-openmetrics#5a8cfe0cd290ef85a4dc30464f9ef3b131165091"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77220f999a1266b19388590ef7d6b9f6d194b55ef2d2b43901886714c5a14100"
 dependencies = [
  "nom 8.0.0",
  "nom-language",
@@ -1926,7 +1927,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -18,7 +18,7 @@ categories = ["command-line-utilities"]
 chrono = "0.4.40"
 nom = "8"
 nom-language = "0.1"
-nom-openmetrics = { git = "https://github.com/drbrain/nom-openmetrics" }
+nom-openmetrics = "0.2.0"
 nu-plugin = "0.104.0"
 nu-protocol = { version = "0.104.0", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
