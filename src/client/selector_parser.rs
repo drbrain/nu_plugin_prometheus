@@ -14,7 +14,7 @@ use prometheus_http_query::Selector;
 pub struct SelectorParser {}
 
 impl SelectorParser {
-    pub fn parse(input: &Value) -> Result<Selector, LabeledError> {
+    pub fn parse(input: &'_ Value) -> Result<Selector<'_>, LabeledError> {
         let span = input.span();
         let input = input.as_str()?;
 
@@ -125,7 +125,7 @@ impl<'a> LabelMatcher<'a> {
     }
 }
 
-fn label(input: &str) -> IResult<&str, LabelMatcher, VerboseError<&str>> {
+fn label(input: &'_ str) -> IResult<&'_ str, LabelMatcher<'_>, VerboseError<&'_ str>> {
     context(
         "label",
         map(
@@ -140,7 +140,7 @@ fn label(input: &str) -> IResult<&str, LabelMatcher, VerboseError<&str>> {
     .parse(input)
 }
 
-fn labels(input: &str) -> IResult<&str, Vec<LabelMatcher>, VerboseError<&str>> {
+fn labels(input: &'_ str) -> IResult<&'_ str, Vec<LabelMatcher<'_>>, VerboseError<&'_ str>> {
     context(
         "labels",
         delimited(tag("{"), separated_list0(tag(","), label), tag("}")),
@@ -189,7 +189,7 @@ fn operation(input: &str) -> IResult<&str, Operation, VerboseError<&str>> {
     .parse(input)
 }
 
-fn selector(input: &str) -> IResult<&str, Selector, VerboseError<&str>> {
+fn selector(input: &'_ str) -> IResult<&'_ str, Selector<'_>, VerboseError<&'_ str>> {
     context(
         "selector",
         complete(terminated(
