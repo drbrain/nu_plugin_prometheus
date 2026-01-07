@@ -3,14 +3,14 @@
 A nushell plugin for querying prometheus
 
 Supports:
-* nushell 0.104.0
+* nushell 0.109.1
 * Prometheus API
-    * Instant queries
-    * Range queryies
-    * Target status
-    * Series
-    * Label names
-    * Label values
+  * Instant queries
+  * Range queryies
+  * Target status
+  * Series
+  * Label names
+  * Label values
 * Saved sources for convenience or mutual TLS authentication
 * Parsing Prometheus output
 * Scraping Prometheus targets
