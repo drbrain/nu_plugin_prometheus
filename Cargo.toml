@@ -1,6 +1,6 @@
 [package]
 name = "nu_plugin_prometheus"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 
 authors = ["Eric Hodel <drbrain@segment7.net>"]
@@ -12,17 +12,15 @@ repository = "https://github.com/drbrain/nu_plugin_prometheus"
 keywords = ["nu", "plugin", "prometheus"]
 categories = ["command-line-utilities"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 chrono = "0.4.41"
 nom = "8"
 nom-language = "0.1"
 nom-openmetrics = "0.2.0"
-nu-plugin = "0.104.0"
-nu-protocol = { version = "0.104.0", features = [ "plugin" ] }
+nu-plugin = "0.109.1"
+nu-protocol = { version = "0.109.1", features = [ "plugin" ] }
 prometheus-http-query = "0.8.3"
-reqwest = { version = "0.12.15", features = [ "native-tls" ] }
+reqwest = { version = "0.12.28", features = [ "native-tls" ] }
 tokio = { version ="1.48.0", features = [ "macros", "rt" ] }
 
 [dev-dependencies]
