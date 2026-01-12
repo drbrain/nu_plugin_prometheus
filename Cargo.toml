@@ -13,7 +13,7 @@ keywords = ["nu", "plugin", "prometheus"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-chrono = "0.4.41"
+chrono = "0.4.42"
 nom = "8"
 nom-language = "0.1"
 nom-openmetrics = "0.2.0"
