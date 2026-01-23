@@ -3,7 +3,7 @@
 A nushell plugin for querying prometheus
 
 Supports:
-* nushell 0.109.1
+* nushell 0.110.0
 * Prometheus API
   * Instant queries
   * Range queryies
