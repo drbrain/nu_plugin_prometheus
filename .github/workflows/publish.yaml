@@ -95,6 +95,8 @@ jobs:
       - build_and_test_windows
 
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -120,14 +122,15 @@ jobs:
           path: ~/.cargo/bin/cargo-release
           key: ${{ runner.os }}-cargo-release
 
-      - name: cargo login
-        run: |-
-          echo "${{ secrets.CRATES_IO_API_TOKEN }}" | cargo login
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
 
       # allow-branch HEAD is because GitHub actions switches
       # to the tag while building, which is a detached head
 
       - name: cargo release publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: |-
           cargo release \
             publish \
