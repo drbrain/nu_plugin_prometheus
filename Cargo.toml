@@ -16,7 +16,7 @@ categories = ["command-line-utilities"]
 chrono = "0.4.42"
 nom = "8"
 nom-language = "0.1"
-nom-openmetrics = "0.2.0"
+nom-openmetrics = "0.3.0"
 nu-plugin = "0.114.0"
 nu-protocol = { version = "0.114.0", features = [ "plugin" ] }
 prometheus-http-query = "0.9.0"
