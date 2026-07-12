@@ -1,6 +1,9 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type,
+    engine::ArgType,
+};
 
 #[derive(Clone, Default)]
 pub struct QueryCommand;
@@ -40,6 +43,24 @@ impl PluginCommand for QueryCommand {
 
     fn description(&self) -> &str {
         "Run an instant query"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: nu_protocol::engine::ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        let ArgType::Flag(flag) = arg_type else {
+            return None;
+        };
+
+        match flag.as_ref() {
+            "source" => Source::completions(engine),
+            _ => None,
+        }
     }
 
     fn run(

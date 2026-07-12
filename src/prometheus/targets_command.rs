@@ -1,6 +1,8 @@
 use crate::{Prometheus, client::Targets, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, PipelineData, Signature, SyntaxShape, Type, engine::ArgType,
+};
 use prometheus_http_query::TargetState;
 
 #[derive(Clone, Default)]
@@ -37,6 +39,40 @@ impl PluginCommand for TargetsCommand {
 
     fn description(&self) -> &str {
         "Query for target discovery state"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: nu_protocol::engine::ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        match arg_type {
+            ArgType::Flag(flag) => match flag.as_ref() {
+                "source" => Source::completions(engine),
+                _ => None,
+            },
+            ArgType::Positional(0) => Some(vec![
+                DynamicSuggestion {
+                    value: "active".into(),
+                    description: Some("Scraped targets".into()),
+                    ..Default::default()
+                },
+                DynamicSuggestion {
+                    value: "any".into(),
+                    description: Some("Scraped or dropped".into()),
+                    ..Default::default()
+                },
+                DynamicSuggestion {
+                    value: "dropped".into(),
+                    description: Some("Discovered but excluded".into()),
+                    ..Default::default()
+                },
+            ]),
+            _ => None,
+        }
     }
 
     fn run(

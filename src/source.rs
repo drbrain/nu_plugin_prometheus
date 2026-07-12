@@ -1,5 +1,5 @@
 use nu_plugin::{EngineInterface, EvaluatedCall};
-use nu_protocol::{LabeledError, Record, Span, Value};
+use nu_protocol::{DynamicSuggestion, LabeledError, Record, Span, Value};
 use prometheus_http_query::Client;
 use reqwest::{Certificate, Identity};
 
@@ -13,6 +13,27 @@ pub struct Source {
 }
 
 impl Source {
+    /// get_dynamic_completion() results for --source
+    //
+    // NOTE: This doesn't work for 0.114.1 because EngineInterface::get_plugin_config() gives the
+    // error: A plugin execution context is required for this engine call
+    pub fn completions(engine: &EngineInterface) -> Option<Vec<DynamicSuggestion>> {
+        Self::list(engine).ok().map(|sources| {
+            sources
+                .iter()
+                .filter_map(|source| {
+                    source.name.as_ref().map(|name| DynamicSuggestion {
+                        value: name.clone(),
+                        kind: Some(nu_protocol::SuggestionKind::Value(
+                            nu_protocol::Type::String,
+                        )),
+                        ..Default::default()
+                    })
+                })
+                .collect()
+        })
+    }
+
     pub fn list(engine: &EngineInterface) -> Result<Vec<Source>, LabeledError> {
         let config = engine.get_plugin_config().map_err(|e| {
             LabeledError::new("Plugin configuration not found").with_help(e.to_string())
@@ -23,7 +44,9 @@ impl Source {
         };
 
         let Some(sources) = config.get_data_by_key("sources") else {
-            return Err(LabeledError::new("Invalid plugin configuration").with_help(r#"Missing "sources""#));
+            return Err(
+                LabeledError::new("Invalid plugin configuration").with_help(r#"Missing "sources""#)
+            );
         };
 
         let sources = sources.as_record().map_err(|_| {
@@ -131,6 +154,17 @@ impl Source {
             cacert,
             span: url_value.span(),
         })
+    }
+}
+impl std::fmt::Debug for Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Source")
+            .field("name", &self.name)
+            .field("url", &self.url)
+            .field("identity", &"…")
+            .field("cacert", &"…")
+            .field("span", &self.span)
+            .finish()
     }
 }
 
