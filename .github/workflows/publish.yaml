@@ -31,33 +31,9 @@ jobs:
   audit:
     name: Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: "Generate Cargo.lock"
-        run: cargo generate-lockfile
-
-      - name: cargo-audit cache restore
-        id: cargo-audit_cache_restore
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cargo/bin/cargo-audit
-          key: ${{ runner.os }}-cargo-audit
-
-      - run: cargo install cargo-audit
-        if: steps.cargo-audit_cache_restore.outputs.cache-hit != 'true'
-
-      - name: cargo-audit cache save
-        id: cargo-audit_cache_save
-        uses: actions/cache/save@v4
-        if: >
-          always()
-          && steps.cargo-audit_cache_restore.outputs.cache-hit != 'true'
-        with:
-          path: ~/.cargo/bin/cargo-audit
-          key: ${{ runner.os }}-cargo-audit
-
-      - uses: rustsec/audit-check@v2
+      - uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
