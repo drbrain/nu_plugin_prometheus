@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "nu_plugin_prometheus"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chrono",
  "nom 8.0.0",
