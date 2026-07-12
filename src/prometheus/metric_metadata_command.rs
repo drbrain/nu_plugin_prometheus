@@ -1,6 +1,9 @@
 use crate::{Prometheus, Source, client::MetricMetadata};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, Signature, Span, SyntaxShape, Type};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, PipelineData, Signature, Span, SyntaxShape, Type,
+    engine::{ArgType, ExperimentalMarker},
+};
 use prometheus_http_query::Client;
 
 #[derive(Clone, Default)]
@@ -48,6 +51,23 @@ impl PluginCommand for MetricMetadataCommand {
 
     fn description(&self) -> &str {
         "Retrieve metric metadata"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        match arg_type {
+            ArgType::Flag(flag) => match flag.as_ref() {
+                "source" => Source::completions(engine),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn run(

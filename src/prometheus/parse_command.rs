@@ -1,9 +1,12 @@
 use crate::{
-    client::{Parse, ParseFormat},
     Prometheus,
+    client::{Parse, ParseFormat},
 };
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, Span, SyntaxShape, Type, Value};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, Signature, Span, SyntaxShape, Type, Value,
+    engine::{ArgType, ExperimentalMarker},
+};
 
 #[derive(Clone, Default)]
 pub struct ParseCommand;
@@ -29,6 +32,35 @@ impl SimplePluginCommand for ParseCommand {
 
     fn description(&self) -> &str {
         "Parse prometheus or openmetrics output"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        _engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        match arg_type {
+            ArgType::Flag(flag) => match flag.as_ref() {
+                "format" => Some(vec![
+                    DynamicSuggestion {
+                        value: "openmetrics".to_string(),
+                        kind: Some(nu_protocol::SuggestionKind::Value(Type::String)),
+                        ..Default::default()
+                    },
+                    DynamicSuggestion {
+                        value: "prometheus".to_string(),
+                        kind: Some(nu_protocol::SuggestionKind::Value(Type::String)),
+                        description: Some("default".into()),
+                        ..Default::default()
+                    },
+                ]),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn run(

@@ -4,7 +4,10 @@ use crate::{
 };
 use chrono::{DateTime, FixedOffset};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type, Value};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, PipelineData, Signature, SyntaxShape, Type, Value,
+    engine::{ArgType, ExperimentalMarker},
+};
 use prometheus_http_query::Client;
 
 #[derive(Clone, Default)]
@@ -45,6 +48,23 @@ impl PluginCommand for SeriesCommand {
 
     fn description(&self) -> &str {
         "Query for series"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        match arg_type {
+            ArgType::Flag(flag) => match flag.as_ref() {
+                "source" => Source::completions(engine),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn run(

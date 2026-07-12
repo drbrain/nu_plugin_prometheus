@@ -1,6 +1,9 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
+use nu_protocol::{
+    DynamicSuggestion, LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type,
+    engine::{ArgType, ExperimentalMarker},
+};
 
 #[derive(Clone, Default)]
 pub struct QueryRangeCommand;
@@ -52,6 +55,24 @@ impl PluginCommand for QueryRangeCommand {
 
     fn description(&self) -> &str {
         "Run a range query"
+    }
+
+    fn get_dynamic_completion(
+        &self,
+        _plugin: &Self::Plugin,
+        engine: &EngineInterface,
+        _call: nu_plugin::DynamicCompletionCall,
+        arg_type: ArgType,
+        _experimental: ExperimentalMarker,
+    ) -> Option<Vec<DynamicSuggestion>> {
+        let ArgType::Flag(flag) = arg_type else {
+            return None;
+        };
+
+        match flag.as_ref() {
+            "source" => Source::completions(engine),
+            _ => None,
+        }
     }
 
     fn run(
