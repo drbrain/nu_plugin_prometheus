@@ -3,7 +3,7 @@
 A nushell plugin for querying prometheus
 
 Supports:
-* nushell 0.110.0
+* nushell 0.114.1
 * Prometheus API
   * Instant queries
   * Range queryies
@@ -50,7 +50,7 @@ openssl pkcs8 -topk8 -inform PEM -outform DER -in user.key -out user.pk8.key
 Use `--source` or `-s` to use a configured source:
 
 ```nushell
-"up" | prometheus query --source prod
+"up" | prometheus query --source production
 ```
 
 ### Queries
@@ -63,12 +63,12 @@ Pipe a prometheus query to `prometheus query` for an instant query:
 "up" | prometheus query --url https://prometheus.example:9090/
 ```
 
-This will output a table:
+This will output a table with flattened labels:
 
-|name|labels|value|timestamp|
-|-|-|-|-|
-|up|{job: prometheus, instance: prometheus.example:9090}|1|1435781451|
-|up|{job: node, instance: prometheus.example:9100}|0|1435781451|
+| name | instance | job | value | timestamp |
+| --- | --- | --- | --- | --- |
+| up | prometheus.example:9090 | prometheus | 1.0 | 1783815120.33 |
+| up | prometheus.example:9100 | node | 1.0 | 1783815120.33 |
 
 #### Range
 
@@ -83,20 +83,26 @@ A range query requires `--start`, `--end` and `--step` arguments:
 |up|{job: prometheus, instance: prometheus.example:9090}|[{value: 1, timestamp: 1435781430}, {value: 1, timestamp: 1435781445} {value: 1, timestamp: 1435781460}]|
 |up|{job: node, instance: prometheus.example:9100}|[{value: 0, timestamp: 1435781430}, {value: 0, timestamp: 1435781445} {value: 1, timestamp: 1435781460}]|
 
+| name | labels | values |
+| --- | --- | --- |
+| up | {job: prometheus, instance: prometheus.example:9090} | [{value: 1.0, timestamp: 1783815211.0}, {value: 1.0, timestamp: 1783815226.0}, {value: 1.0, timestamp: 1783815241.0}] |
+| up | {job: node, instance: prometheus.example:9100} | [{value: 1.0, timestamp: 1783815211.0}, {value: 1.0, timestamp: 1783815226.0}, {value: 1.0, timestamp: 1783815241.0}] |
 #### Flattening labels
 
-Adding `--flatten` will flatten labels into each row.
+Adding `--no-flatten` will place labels in a "labels" column.  This is useful
+if one of the labels matches a query column like "name".
 
 ```nushell
-"up" | prometheus query --url https://prometheus.example:9090/ --flatten
+"up" | prometheus query --url https://prometheus.example:9090/ --no-flatten
 ```
 
 Outputs:
 
-|name|instance|job|value|timestamp|
-|-|-|-|-|-|
-|up|prometheus.example:9090|prometheus|1|1435781451|
-|up|prometheus.example:9100|job|0|1435781451|
+| name | labels | value | timestamp |
+| --- | --- | --- | --- |
+| up | {instance: prometheus.example:9090, job: prometheus} | 1.0 | 1783815298.833 |
+| up | {job: node, instance: prometheus.example:9100} | 1.0 | 1783815298.833 |
+
 
 If a metric uses "name" as a label it will overwrite the "name" column.
 

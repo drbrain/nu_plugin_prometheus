@@ -1,4 +1,4 @@
-use crate::{client::QueryBuilder, source::Source, Prometheus};
+use crate::{Prometheus, client::QueryBuilder, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
 
@@ -46,7 +46,7 @@ impl SimplePluginCommand for QueryRangeCommand {
                 "Prometheus source url to query",
                 Some('u'),
             )
-            .switch("flatten", "Flatten labels into record", Some('f'))
+            .switch("no-flatten", "Do not flatten labels into record", None)
             .input_output_type(Type::String, Type::Any)
     }
 
@@ -79,7 +79,7 @@ impl SimplePluginCommand for QueryRangeCommand {
             query_builder.timeout(timeout);
         }
 
-        if call.has_flag("flatten")? {
+        if !call.has_flag("no-flatten")? {
             query_builder.flatten();
         }
 
