@@ -1,118 +1,103 @@
-use nu_protocol::{Record, Span, Value, record};
+use nu_protocol::{
+    IntoInterruptiblePipelineData, PipelineData, Record, Signals, Span, Value, record,
+};
 use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
 use std::collections::HashMap;
 
-pub trait Query {
-    fn call_span(&self) -> Span;
-
-    fn add_labels(&self, record: &mut Record, metric: &HashMap<String, String>, flatten: bool) {
-        if flatten {
-            for (name, label) in metric {
-                if name == "__name__" {
-                    continue;
-                }
-
-                record.push(name, Value::string(label, self.call_span()));
-            }
-        } else {
-            let mut labels = Record::new();
-            for (name, label) in metric {
-                if name == "__name__" {
-                    continue;
-                }
-                labels.push(name, Value::string(label, self.call_span()));
+fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bool, span: Span) {
+    if flatten {
+        for (name, label) in metric {
+            if name == "__name__" {
+                continue;
             }
 
-            record.insert("labels", Value::record(labels, self.call_span()));
+            record.push(name, Value::string(label, span));
         }
+    } else {
+        let mut labels = Record::new();
+        for (name, label) in metric {
+            if name == "__name__" {
+                continue;
+            }
+            labels.push(name, Value::string(label, span));
+        }
+
+        record.insert("labels", Value::record(labels, span));
     }
+}
 
-    fn matrix_to_value(&self, matrix: &[RangeVector], flatten: bool) -> Value {
-        let records = matrix
-            .iter()
-            .map(|rv| {
-                let metric = rv.metric();
-                let values = rv
-                    .samples()
-                    .iter()
-                    .map(|value| self.scalar_to_value(value))
-                    .collect();
+pub fn matrix_to_value(matrix: Vec<RangeVector>, flatten: bool, span: Span) -> PipelineData {
+    matrix
+        .into_iter()
+        .map(move |rv| {
+            let metric = rv.metric();
+            let values = rv
+                .samples()
+                .iter()
+                .map(|value| scalar_to_value(value, span))
+                .collect();
 
-                let name = metric
-                    .get("__name__")
-                    .cloned()
-                    .unwrap_or("[UNKNOWN]".to_string());
+            let name = metric
+                .get("__name__")
+                .cloned()
+                .unwrap_or("[UNKNOWN]".to_string());
 
-                let mut record = record! {
-                    "name" => Value::string(name, self.call_span()),
-                };
+            let mut record = record! {
+                "name" => Value::string(name, span),
+            };
 
-                self.add_labels(&mut record, metric, flatten);
+            add_labels(&mut record, metric, flatten, span);
 
-                record.insert("values", Value::list(values, self.call_span()));
+            record.insert("values", Value::list(values, span));
 
-                Value::record(record, self.call_span())
-            })
-            .collect();
+            Value::record(record, span)
+        })
+        .into_pipeline_data(span, Signals::empty())
+}
 
-        Value::list(records, self.call_span())
-    }
+pub fn scalar_to_value(scalar: &Sample, span: Span) -> Value {
+    Value::record(
+        record! {
+            "value" => Value::float(scalar.value(), span),
+            "timestamp" => Value::float(scalar.timestamp(), span)
+        },
+        span,
+    )
+}
 
-    fn scalar_to_value(&self, scalar: &Sample) -> Value {
-        Value::record(
-            record! {
-                "value" => Value::float(scalar.value(), self.call_span()),
-                "timestamp" => Value::float(scalar.timestamp(), self.call_span())
-            },
-            self.call_span(),
-        )
-    }
+pub fn vector_to_value(vector: Vec<InstantVector>, flatten: bool, span: Span) -> PipelineData {
+    vector
+        .into_iter()
+        .map(move |iv| {
+            let metric = iv.metric();
 
-    fn vector_to_value(&self, vector: &[InstantVector], flatten: bool) -> Value {
-        let records = vector
-            .iter()
-            .map(|iv| {
-                let metric = iv.metric();
+            let name = metric
+                .get("__name__")
+                .cloned()
+                .unwrap_or("[UNKNOWN]".to_string());
 
-                let name = metric
-                    .get("__name__")
-                    .cloned()
-                    .unwrap_or("[UNKNOWN]".to_string());
+            let mut record = record! {
+                "name" => Value::string(name, span),
+            };
 
-                let mut record = record! {
-                    "name" => Value::string(name, self.call_span()),
-                };
+            add_labels(&mut record, metric, flatten, span);
 
-                self.add_labels(&mut record, metric, flatten);
+            let value = Value::float(iv.sample().value(), span);
+            record.insert("value", value);
 
-                let value = Value::float(iv.sample().value(), self.call_span());
-                record.insert("value", value);
+            let timestamp = Value::float(iv.sample().timestamp(), span);
+            record.insert("timestamp", timestamp);
 
-                let timestamp = Value::float(iv.sample().timestamp(), self.call_span());
-                record.insert("timestamp", timestamp);
-
-                Value::record(record, self.call_span())
-            })
-            .collect();
-
-        Value::list(records, self.call_span())
-    }
+            Value::record(record, span)
+        })
+        .into_pipeline_data(span, Signals::empty())
 }
 
 #[cfg(test)]
 mod test {
-    use super::Query;
     use nu_protocol::{Span, Value, record};
     use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
     use std::collections::HashMap;
-
-    struct QueryImpl;
-
-    impl Query for QueryImpl {
-        fn call_span(&self) -> Span {
-            Span::unknown()
-        }
-    }
 
     #[test]
     fn add_labels_flatten() {
@@ -122,9 +107,7 @@ mod test {
 
         let mut record = record! {};
 
-        let query = QueryImpl;
-
-        query.add_labels(&mut record, &metric, true);
+        super::add_labels(&mut record, &metric, true, Span::unknown());
 
         assert_eq!(
             Value::string("prometheus", Span::unknown()),
@@ -145,9 +128,7 @@ mod test {
 
         let mut record = record! {};
 
-        let query = QueryImpl;
-
-        query.add_labels(&mut record, &metric, false);
+        super::add_labels(&mut record, &metric, false, Span::unknown());
 
         let expected = Value::record(
             record! {
@@ -191,9 +172,7 @@ mod test {
         .as_bytes();
         let matrix: Vec<RangeVector> = serde_json::from_slice(data).unwrap();
 
-        let query = QueryImpl;
-
-        let result = query.matrix_to_value(&matrix, false);
+        let result = super::matrix_to_value(matrix, false, Span::unknown());
 
         let record = result
             .clone()
@@ -221,9 +200,9 @@ mod test {
         let data = r#"[1716956024.754,"1"]"#.as_bytes();
         let scalar: Sample = serde_json::from_slice(data).unwrap();
 
-        let query = QueryImpl;
-
-        let result = query.scalar_to_value(&scalar).into_record().unwrap();
+        let result = super::scalar_to_value(&scalar, Span::unknown())
+            .into_record()
+            .unwrap();
 
         assert_eq!(1.0, result.get("value").unwrap().as_float().unwrap());
         assert_eq!(
@@ -237,9 +216,9 @@ mod test {
         let data = r#"[{"metric":{"__name__":"up","instance":"target.example","job":"job name"},"value":[1716956024.754,"1"]}]"#.as_bytes();
         let vector: Vec<InstantVector> = serde_json::from_slice(data).unwrap();
 
-        let query = QueryImpl;
-
-        let result = query.vector_to_value(&vector, false).into_list().unwrap();
+        let result = super::vector_to_value(vector, false, Span::unknown())
+            .into_list()
+            .unwrap();
 
         let record = result.first().unwrap().as_record().unwrap();
 

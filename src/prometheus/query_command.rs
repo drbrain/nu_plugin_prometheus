@@ -1,6 +1,6 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
+use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type};
 
 #[derive(Clone, Default)]
 pub struct QueryCommand;
@@ -70,10 +70,5 @@ impl PluginCommand for QueryCommand {
         query_builder
             .instant(at, &query, query_span, call_span)
             .run()
-            .map(|response| {
-                let metadata = PipelineMetadata::default();
-
-                PipelineData::value(response, metadata)
-            })
     }
 }

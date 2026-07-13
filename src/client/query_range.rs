@@ -1,5 +1,8 @@
-use crate::{Client, Query};
-use nu_protocol::{LabeledError, Span, Value};
+use crate::{
+    Client,
+    query::{matrix_to_value, scalar_to_value, vector_to_value},
+};
+use nu_protocol::{IntoPipelineData, LabeledError, PipelineData, Span};
 use prometheus_http_query::{RangeQueryBuilder, response::Data};
 
 pub struct QueryRange {
@@ -19,12 +22,12 @@ impl QueryRange {
         }
     }
 
-    pub fn run(self) -> Result<Value, LabeledError> {
+    pub fn run(self) -> Result<PipelineData, LabeledError> {
         let QueryRange {
             ref query,
-            query_span: span,
+            query_span,
             flatten,
-            ..
+            call_span,
         } = self;
 
         self.runtime()?.block_on(async {
@@ -32,23 +35,17 @@ impl QueryRange {
                 .clone()
                 .get()
                 .await
-                .map_err(|error| self.labeled_error(error, span))?;
+                .map_err(|error| self.labeled_error(error, query_span))?;
 
-            let value = match response.data() {
-                Data::Vector(v) => self.vector_to_value(v, flatten),
-                Data::Matrix(m) => self.matrix_to_value(m, flatten),
-                Data::Scalar(s) => self.scalar_to_value(s),
+            let pipeline = match response.into_inner().0 {
+                Data::Vector(v) => vector_to_value(v, flatten, call_span),
+                Data::Matrix(m) => matrix_to_value(m, flatten, call_span),
+                Data::Scalar(s) => scalar_to_value(&s, call_span).into_pipeline_data(),
             };
 
-            Ok(value)
+            Ok(pipeline)
         })
     }
 }
 
 impl Client for QueryRange {}
-
-impl Query for QueryRange {
-    fn call_span(&self) -> Span {
-        self.call_span
-    }
-}

@@ -1,6 +1,6 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
+use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type};
 
 #[derive(Clone, Default)]
 pub struct QueryRangeCommand;
@@ -88,11 +88,6 @@ impl PluginCommand for QueryRangeCommand {
                 query_builder
                     .range(start, end, step, &query, query_span, call_span)
                     .run()
-                    .map(|response| {
-                        let metadata = PipelineMetadata::default();
-
-                        PipelineData::value(response, metadata)
-                    })
             }
             _ => {
                 let mut missing = vec![];

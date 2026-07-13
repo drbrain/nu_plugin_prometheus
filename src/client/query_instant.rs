@@ -1,5 +1,8 @@
-use crate::{Client, Query};
-use nu_protocol::{LabeledError, Span, Value};
+use crate::{
+    Client,
+    query::{matrix_to_value, scalar_to_value, vector_to_value},
+};
+use nu_protocol::{IntoPipelineData, LabeledError, PipelineData, Span};
 use prometheus_http_query::{InstantQueryBuilder, response::Data};
 
 pub struct QueryInstant {
@@ -24,12 +27,12 @@ impl QueryInstant {
         }
     }
 
-    pub fn run(self) -> Result<Value, LabeledError> {
+    pub fn run(self) -> Result<PipelineData, LabeledError> {
         let QueryInstant {
             ref query,
-            query_span: span,
+            query_span,
             flatten,
-            ..
+            call_span,
         } = self;
 
         self.runtime()?.block_on(async {
@@ -37,23 +40,17 @@ impl QueryInstant {
                 .clone()
                 .get()
                 .await
-                .map_err(|error| self.labeled_error(error, span))?;
+                .map_err(|error| self.labeled_error(error, query_span))?;
 
-            let value = match response.data() {
-                Data::Vector(v) => self.vector_to_value(v, flatten),
-                Data::Matrix(m) => self.matrix_to_value(m, flatten),
-                Data::Scalar(s) => self.scalar_to_value(s),
+            let data = match response.into_inner().0 {
+                Data::Vector(v) => vector_to_value(v, flatten, call_span),
+                Data::Matrix(m) => matrix_to_value(m, flatten, call_span),
+                Data::Scalar(s) => scalar_to_value(&s, call_span).into_pipeline_data(),
             };
 
-            Ok(value)
+            Ok(data)
         })
     }
 }
 
 impl Client for QueryInstant {}
-
-impl Query for QueryInstant {
-    fn call_span(&self) -> Span {
-        self.call_span
-    }
-}
