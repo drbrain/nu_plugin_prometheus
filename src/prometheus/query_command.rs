@@ -1,11 +1,11 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
 
 #[derive(Clone, Default)]
 pub struct QueryCommand;
 
-impl SimplePluginCommand for QueryCommand {
+impl PluginCommand for QueryCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -47,17 +47,11 @@ impl SimplePluginCommand for QueryCommand {
         _plugin: &Prometheus,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        query: &Value,
-    ) -> Result<Value, LabeledError> {
-        if !matches!(query, Value::String { .. }) {
-            // Unreachable as we only accept String input
-            return Err(
-                LabeledError::new("Expected query string from pipeline").with_label(
-                    format!("requires string input; got {}", query.get_type()),
-                    call.head,
-                ),
-            );
-        }
+        query: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let call_span = call.head;
+
+        let (query, query_span, _) = query.collect_string_strict(call_span)?;
 
         let source = Source::from(call, engine)?;
 
@@ -73,6 +67,13 @@ impl SimplePluginCommand for QueryCommand {
 
         let at = call.get_flag("at")?;
 
-        query_builder.instant(at, query).run()
+        query_builder
+            .instant(at, &query, query_span)
+            .run()
+            .map(|response| {
+                let metadata = PipelineMetadata::default();
+
+                PipelineData::value(response, metadata)
+            })
     }
 }

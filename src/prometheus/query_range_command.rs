@@ -1,11 +1,11 @@
 use crate::{Prometheus, client::QueryBuilder, source::Source};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, PipelineMetadata, Signature, SyntaxShape, Type};
 
 #[derive(Clone, Default)]
 pub struct QueryRangeCommand;
 
-impl SimplePluginCommand for QueryRangeCommand {
+impl PluginCommand for QueryRangeCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -59,17 +59,11 @@ impl SimplePluginCommand for QueryRangeCommand {
         _plugin: &Prometheus,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        query: &Value,
-    ) -> Result<Value, LabeledError> {
-        if !matches!(query, Value::String { .. }) {
-            // Unreachable as we only accept String input
-            return Err(
-                LabeledError::new("Expected query string from pipeline").with_label(
-                    format!("requires string input; got {}", query.get_type()),
-                    call.head,
-                ),
-            );
-        }
+        query: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let call_span = call.head;
+
+        let (query, query_span, _) = query.collect_string_strict(call_span)?;
 
         let source = Source::from(call, engine)?;
 
@@ -91,7 +85,14 @@ impl SimplePluginCommand for QueryRangeCommand {
             (Some(start), Some(end), Some(step)) => {
                 let step = step as f64 / 1_000_000_000.0;
 
-                query_builder.range(start, end, step, query).run()
+                query_builder
+                    .range(start, end, step, &query, query_span)
+                    .run()
+                    .map(|response| {
+                        let metadata = PipelineMetadata::default();
+
+                        PipelineData::value(response, metadata)
+                    })
             }
             _ => {
                 let mut missing = vec![];
@@ -108,7 +109,7 @@ impl SimplePluginCommand for QueryRangeCommand {
                 let missing = missing.join(", ");
 
                 Err(LabeledError::new("Missing query range arguments")
-                    .with_label(format!("Missing: {missing}"), query.span()))
+                    .with_label(format!("Missing: {missing}"), call_span))
             }
         }
     }
