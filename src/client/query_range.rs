@@ -1,27 +1,30 @@
 use crate::{Client, Query};
 use nu_protocol::{LabeledError, Span, Value};
-use prometheus_http_query::{response::Data, RangeQueryBuilder};
+use prometheus_http_query::{RangeQueryBuilder, response::Data};
 
 pub struct QueryRange {
     query: RangeQueryBuilder,
-    span: Span,
+    query_span: Span,
     flatten: bool,
+    call_span: Span,
 }
 
 impl QueryRange {
-    pub fn new(query: RangeQueryBuilder, span: Span, flatten: bool) -> Self {
+    pub fn new(query: RangeQueryBuilder, query_span: Span, flatten: bool, call_span: Span) -> Self {
         Self {
             query,
-            span,
+            query_span,
             flatten,
+            call_span,
         }
     }
 
     pub fn run(self) -> Result<Value, LabeledError> {
         let QueryRange {
             ref query,
-            span,
+            query_span: span,
             flatten,
+            ..
         } = self;
 
         self.runtime()?.block_on(async {
@@ -44,4 +47,8 @@ impl QueryRange {
 
 impl Client for QueryRange {}
 
-impl Query for QueryRange {}
+impl Query for QueryRange {
+    fn call_span(&self) -> Span {
+        self.call_span
+    }
+}

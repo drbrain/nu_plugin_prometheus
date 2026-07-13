@@ -1,27 +1,35 @@
 use crate::{Client, Query};
 use nu_protocol::{LabeledError, Span, Value};
-use prometheus_http_query::{response::Data, InstantQueryBuilder};
+use prometheus_http_query::{InstantQueryBuilder, response::Data};
 
 pub struct QueryInstant {
     query: InstantQueryBuilder,
-    span: Span,
+    query_span: Span,
     flatten: bool,
+    call_span: Span,
 }
 
 impl QueryInstant {
-    pub fn new(query: InstantQueryBuilder, span: Span, flatten: bool) -> Self {
+    pub fn new(
+        query: InstantQueryBuilder,
+        query_span: Span,
+        flatten: bool,
+        call_span: Span,
+    ) -> Self {
         Self {
             query,
-            span,
+            query_span,
             flatten,
+            call_span,
         }
     }
 
     pub fn run(self) -> Result<Value, LabeledError> {
         let QueryInstant {
             ref query,
-            span,
+            query_span: span,
             flatten,
+            ..
         } = self;
 
         self.runtime()?.block_on(async {
@@ -44,4 +52,8 @@ impl QueryInstant {
 
 impl Client for QueryInstant {}
 
-impl Query for QueryInstant {}
+impl Query for QueryInstant {
+    fn call_span(&self) -> Span {
+        self.call_span
+    }
+}

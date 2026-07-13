@@ -1,8 +1,10 @@
-use nu_protocol::{record, Record, Span, Value};
+use nu_protocol::{Record, Span, Value, record};
 use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
 use std::collections::HashMap;
 
 pub trait Query {
+    fn call_span(&self) -> Span;
+
     fn add_labels(&self, record: &mut Record, metric: &HashMap<String, String>, flatten: bool) {
         if flatten {
             for (name, label) in metric {
@@ -10,7 +12,7 @@ pub trait Query {
                     continue;
                 }
 
-                record.push(name, Value::string(label, Span::unknown()));
+                record.push(name, Value::string(label, self.call_span()));
             }
         } else {
             let mut labels = Record::new();
@@ -18,10 +20,10 @@ pub trait Query {
                 if name == "__name__" {
                     continue;
                 }
-                labels.push(name, Value::string(label, Span::unknown()));
+                labels.push(name, Value::string(label, self.call_span()));
             }
 
-            record.insert("labels", Value::record(labels, Span::unknown()));
+            record.insert("labels", Value::record(labels, self.call_span()));
         }
     }
 
@@ -42,27 +44,27 @@ pub trait Query {
                     .unwrap_or("[UNKNOWN]".to_string());
 
                 let mut record = record! {
-                    "name" => Value::string(name, Span::unknown()),
+                    "name" => Value::string(name, self.call_span()),
                 };
 
                 self.add_labels(&mut record, metric, flatten);
 
-                record.insert("values", Value::list(values, Span::unknown()));
+                record.insert("values", Value::list(values, self.call_span()));
 
-                Value::record(record, Span::unknown())
+                Value::record(record, self.call_span())
             })
             .collect();
 
-        Value::list(records, Span::unknown())
+        Value::list(records, self.call_span())
     }
 
     fn scalar_to_value(&self, scalar: &Sample) -> Value {
         Value::record(
             record! {
-                "value" => Value::float(scalar.value(), Span::unknown()),
-                "timestamp" => Value::float(scalar.timestamp(), Span::unknown())
+                "value" => Value::float(scalar.value(), self.call_span()),
+                "timestamp" => Value::float(scalar.timestamp(), self.call_span())
             },
-            Span::unknown(),
+            self.call_span(),
         )
     }
 
@@ -78,35 +80,39 @@ pub trait Query {
                     .unwrap_or("[UNKNOWN]".to_string());
 
                 let mut record = record! {
-                    "name" => Value::string(name, Span::unknown()),
+                    "name" => Value::string(name, self.call_span()),
                 };
 
                 self.add_labels(&mut record, metric, flatten);
 
-                let value = Value::float(iv.sample().value(), Span::unknown());
+                let value = Value::float(iv.sample().value(), self.call_span());
                 record.insert("value", value);
 
-                let timestamp = Value::float(iv.sample().timestamp(), Span::unknown());
+                let timestamp = Value::float(iv.sample().timestamp(), self.call_span());
                 record.insert("timestamp", timestamp);
 
-                Value::record(record, Span::unknown())
+                Value::record(record, self.call_span())
             })
             .collect();
 
-        Value::list(records, Span::unknown())
+        Value::list(records, self.call_span())
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::Query;
-    use nu_protocol::{record, Span, Value};
+    use nu_protocol::{Span, Value, record};
     use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
     use std::collections::HashMap;
 
     struct QueryImpl;
 
-    impl Query for QueryImpl {}
+    impl Query for QueryImpl {
+        fn call_span(&self) -> Span {
+            Span::unknown()
+        }
+    }
 
     #[test]
     fn add_labels_flatten() {

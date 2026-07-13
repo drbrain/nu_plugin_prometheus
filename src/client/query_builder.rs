@@ -30,7 +30,8 @@ impl QueryBuilder {
         self,
         at: Option<DateTime<FixedOffset>>,
         query: &str,
-        span: Span,
+        query_span: Span,
+        call_span: Span,
     ) -> QueryInstant {
         let mut query = self.client.query(query);
 
@@ -42,7 +43,7 @@ impl QueryBuilder {
             query = query.timeout(timeout);
         }
 
-        QueryInstant::new(query, span, self.flatten)
+        QueryInstant::new(query, query_span, self.flatten, call_span)
     }
 
     pub fn range(
@@ -51,7 +52,8 @@ impl QueryBuilder {
         end: DateTime<FixedOffset>,
         step: f64,
         query: &str,
-        span: Span,
+        query_span: Span,
+        call_span: Span,
     ) -> QueryRange {
         let start = start.timestamp();
         let end = end.timestamp();
@@ -62,6 +64,6 @@ impl QueryBuilder {
             query = query.timeout(timeout);
         }
 
-        QueryRange::new(query, span, self.flatten)
+        QueryRange::new(query, query_span, self.flatten, call_span)
     }
 }

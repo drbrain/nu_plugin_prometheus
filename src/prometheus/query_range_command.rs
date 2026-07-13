@@ -86,7 +86,7 @@ impl PluginCommand for QueryRangeCommand {
                 let step = step as f64 / 1_000_000_000.0;
 
                 query_builder
-                    .range(start, end, step, &query, query_span)
+                    .range(start, end, step, &query, query_span, call_span)
                     .run()
                     .map(|response| {
                         let metadata = PipelineMetadata::default();

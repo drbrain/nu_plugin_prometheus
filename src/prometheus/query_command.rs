@@ -68,7 +68,7 @@ impl PluginCommand for QueryCommand {
         let at = call.get_flag("at")?;
 
         query_builder
-            .instant(at, &query, query_span)
+            .instant(at, &query, query_span, call_span)
             .run()
             .map(|response| {
                 let metadata = PipelineMetadata::default();
