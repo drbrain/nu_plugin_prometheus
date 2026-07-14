@@ -81,37 +81,34 @@ impl PluginCommand for QueryRangeCommand {
         let end = call.get_flag("end")?;
         let step = call.get_flag::<i64>("step")?;
 
-        match (start, end, step) {
-            (Some(start), Some(end), Some(step)) => {
-                let step = step as f64 / 1_000_000_000.0;
+        let (Some(start), Some(end), Some(step)) = (start, end, step) else {
+            let mut missing = vec![];
 
-                query_builder
-                    .range(start, end, step, &query, query_span, call_span)
-                    .run()
-                    .map(|pipeline| {
-                        let metadata = PipelineMetadata::default()
-                            .with_table_width_priority_columns(call_span, ["name"]);
-
-                        pipeline.set_metadata(Some(metadata))
-                    })
+            if call.get_flag_value("start").is_none() {
+                missing.push("--start");
             }
-            _ => {
-                let mut missing = vec![];
-
-                if call.get_flag_value("start").is_none() {
-                    missing.push("--start");
-                }
-                if call.get_flag_value("end").is_none() {
-                    missing.push("--end");
-                }
-                if call.get_flag_value("step").is_none() {
-                    missing.push("--step");
-                }
-                let missing = missing.join(", ");
-
-                Err(LabeledError::new("Missing query range arguments")
-                    .with_label(format!("Missing: {missing}"), call_span))
+            if call.get_flag_value("end").is_none() {
+                missing.push("--end");
             }
-        }
+            if call.get_flag_value("step").is_none() {
+                missing.push("--step");
+            }
+            let missing = missing.join(", ");
+
+            return Err(LabeledError::new("Missing query range arguments")
+                .with_label(format!("Missing: {missing}"), call_span));
+        };
+
+        let step = step as f64 / 1_000_000_000.0;
+
+        query_builder
+            .range(start, end, step, &query, query_span, call_span)
+            .run()
+            .map(|pipeline| {
+                let metadata = PipelineMetadata::default()
+                    .with_table_width_priority_columns(call_span, ["name"]);
+
+                pipeline.set_metadata(Some(metadata))
+            })
     }
 }
