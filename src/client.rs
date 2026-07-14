@@ -55,3 +55,22 @@ pub trait Client {
             .map_err(|e| LabeledError::new("Tokio runtime build error").with_help(e.to_string()))
     }
 }
+
+pub fn labeled_error(error: prometheus_http_query::Error, span: Span) -> LabeledError {
+    use prometheus_http_query::Error;
+
+    match error {
+        Error::Client(e) => {
+            LabeledError::new("Prometheus client error").with_label(e.to_string(), span)
+        }
+        Error::EmptySeriesSelector => {
+            LabeledError::new("Empty series selector").with_label("", span)
+        }
+        // This error should be impossible to reach because it should occur when building the client
+        Error::ParseUrl(e) => LabeledError::new("Invalid URL").with_help(e.to_string()),
+        Error::Prometheus(e) => {
+            LabeledError::new("Prometheus error").with_label(e.to_string(), span)
+        }
+        e => LabeledError::new("Other error").with_label(e.to_string(), span),
+    }
+}

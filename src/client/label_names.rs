@@ -1,33 +1,46 @@
-use crate::Client;
-use nu_protocol::{LabeledError, Span, Value};
+use crate::{Client, client::labeled_error};
+use nu_protocol::{
+    IntoInterruptiblePipelineData, LabeledError, PipelineData, Signals, Span, Value,
+};
 use prometheus_http_query::LabelNamesQueryBuilder;
 
 pub struct LabelNames {
-    query: LabelNamesQueryBuilder,
-    span: Span,
+    selectors: LabelNamesQueryBuilder,
+    selectors_span: Span,
+    call_span: Span,
 }
 
 impl LabelNames {
-    pub fn new(query: LabelNamesQueryBuilder, span: Span) -> Self {
-        Self { query, span }
+    pub fn new(selectors: LabelNamesQueryBuilder, selectors_span: Span, call_span: Span) -> Self {
+        Self {
+            selectors,
+            selectors_span,
+            call_span,
+        }
     }
 
-    pub fn run(self) -> Result<Value, LabeledError> {
-        let Self { ref query, span } = self;
+    pub fn run(self) -> Result<PipelineData, LabeledError> {
+        let runtime = self.runtime()?;
 
-        self.runtime()?.block_on(async {
+        let Self {
+            selectors: query,
+            selectors_span: query_span,
+            call_span,
+        } = self;
+
+        runtime.block_on(async {
             let response = query
                 .clone()
                 .get()
                 .await
-                .map_err(|error| self.labeled_error(error, span))?;
+                .map_err(|error| labeled_error(error, query_span))?;
 
             let names = response
-                .iter()
-                .map(|name| Value::string(name, Span::unknown()))
-                .collect();
+                .into_iter()
+                .map(move |name| Value::string(name, call_span))
+                .into_pipeline_data(call_span, Signals::empty());
 
-            Ok(Value::list(names, Span::unknown()))
+            Ok(names)
         })
     }
 }
