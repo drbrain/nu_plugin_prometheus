@@ -84,6 +84,6 @@ impl PluginCommand for LabelValuesCommand {
             label_span,
             call_span,
         )
-        .run()
+        .run(engine.signals())
     }
 }
