@@ -1,4 +1,4 @@
-use crate::{Client, client::labeled_error};
+use crate::{Client, client::labeled_error, signals::run_with_signal};
 use nu_protocol::{
     IntoInterruptiblePipelineData, LabeledError, PipelineData, Signals, Span, Value,
 };
@@ -19,7 +19,7 @@ impl LabelNames {
         }
     }
 
-    pub fn run(self) -> Result<PipelineData, LabeledError> {
+    pub fn run(self, signals: &Signals) -> Result<PipelineData, LabeledError> {
         let runtime = self.runtime()?;
 
         let Self {
@@ -29,16 +29,14 @@ impl LabelNames {
         } = self;
 
         runtime.block_on(async {
-            let response = query
-                .clone()
-                .get()
-                .await
+            let response = run_with_signal(signals, call_span, query.clone().get())
+                .await?
                 .map_err(|error| labeled_error(error, query_span))?;
 
             let names = response
                 .into_iter()
                 .map(move |name| Value::string(name, call_span))
-                .into_pipeline_data(call_span, Signals::empty());
+                .into_pipeline_data(call_span, signals.clone());
 
             Ok(names)
         })

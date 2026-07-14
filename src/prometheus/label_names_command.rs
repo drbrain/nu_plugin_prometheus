@@ -77,6 +77,6 @@ impl PluginCommand for LabelNamesCommand {
             selectors.span(),
             call.head,
         )
-        .run()
+        .run(engine.signals())
     }
 }
