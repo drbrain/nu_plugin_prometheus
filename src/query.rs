@@ -175,7 +175,8 @@ mod test {
         let result = super::matrix_to_value(matrix, false, Span::unknown());
 
         let record = result
-            .clone()
+            .into_value(Span::unknown())
+            .unwrap()
             .into_list()
             .unwrap()
             .first()
@@ -217,6 +218,8 @@ mod test {
         let vector: Vec<InstantVector> = serde_json::from_slice(data).unwrap();
 
         let result = super::vector_to_value(vector, false, Span::unknown())
+            .into_value(Span::unknown())
+            .unwrap()
             .into_list()
             .unwrap();
 
