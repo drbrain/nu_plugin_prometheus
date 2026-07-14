@@ -1,8 +1,9 @@
 use crate::{
     Client,
     query::{matrix_to_value, scalar_to_value, vector_to_value},
+    signals::run_with_signal,
 };
-use nu_protocol::{IntoPipelineData, LabeledError, PipelineData, Span};
+use nu_protocol::{IntoPipelineData, LabeledError, PipelineData, Signals, Span};
 use prometheus_http_query::{InstantQueryBuilder, response::Data};
 
 pub struct QueryInstant {
@@ -27,7 +28,7 @@ impl QueryInstant {
         }
     }
 
-    pub fn run(self) -> Result<PipelineData, LabeledError> {
+    pub fn run(self, signals: &Signals) -> Result<PipelineData, LabeledError> {
         let QueryInstant {
             ref query,
             query_span,
@@ -36,15 +37,13 @@ impl QueryInstant {
         } = self;
 
         self.runtime()?.block_on(async {
-            let response = query
-                .clone()
-                .get()
-                .await
+            let response = run_with_signal(signals, call_span, query.clone().get())
+                .await?
                 .map_err(|error| self.labeled_error(error, query_span))?;
 
             let data = match response.into_inner().0 {
-                Data::Vector(v) => vector_to_value(v, flatten, call_span),
-                Data::Matrix(m) => matrix_to_value(m, flatten, call_span),
+                Data::Vector(v) => vector_to_value(v, flatten, call_span, signals),
+                Data::Matrix(m) => matrix_to_value(m, flatten, call_span, signals),
                 Data::Scalar(s) => scalar_to_value(&s, call_span).into_pipeline_data(),
             };
 

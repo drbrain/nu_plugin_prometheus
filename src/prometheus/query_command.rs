@@ -69,7 +69,7 @@ impl PluginCommand for QueryCommand {
 
         query_builder
             .instant(at, &query, query_span, call_span)
-            .run()
+            .run(engine.signals())
             .map(|pipeline| {
                 let metadata = PipelineMetadata::default()
                     .with_table_width_priority_columns(call_span, ["name", "value"]);

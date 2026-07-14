@@ -26,7 +26,12 @@ fn add_labels(record: &mut Record, metric: &HashMap<String, String>, flatten: bo
     }
 }
 
-pub fn matrix_to_value(matrix: Vec<RangeVector>, flatten: bool, span: Span) -> PipelineData {
+pub fn matrix_to_value(
+    matrix: Vec<RangeVector>,
+    flatten: bool,
+    span: Span,
+    signals: &Signals,
+) -> PipelineData {
     matrix
         .into_iter()
         .map(move |rv| {
@@ -52,7 +57,7 @@ pub fn matrix_to_value(matrix: Vec<RangeVector>, flatten: bool, span: Span) -> P
 
             Value::record(record, span)
         })
-        .into_pipeline_data(span, Signals::empty())
+        .into_pipeline_data(span, signals.clone())
 }
 
 pub fn scalar_to_value(scalar: &Sample, span: Span) -> Value {
@@ -65,7 +70,12 @@ pub fn scalar_to_value(scalar: &Sample, span: Span) -> Value {
     )
 }
 
-pub fn vector_to_value(vector: Vec<InstantVector>, flatten: bool, span: Span) -> PipelineData {
+pub fn vector_to_value(
+    vector: Vec<InstantVector>,
+    flatten: bool,
+    span: Span,
+    signals: &Signals,
+) -> PipelineData {
     vector
         .into_iter()
         .map(move |iv| {
@@ -90,12 +100,12 @@ pub fn vector_to_value(vector: Vec<InstantVector>, flatten: bool, span: Span) ->
 
             Value::record(record, span)
         })
-        .into_pipeline_data(span, Signals::empty())
+        .into_pipeline_data(span, signals.clone())
 }
 
 #[cfg(test)]
 mod test {
-    use nu_protocol::{Span, Value, record};
+    use nu_protocol::{Signals, Span, Value, record};
     use prometheus_http_query::response::{InstantVector, RangeVector, Sample};
     use std::collections::HashMap;
 
@@ -172,7 +182,7 @@ mod test {
         .as_bytes();
         let matrix: Vec<RangeVector> = serde_json::from_slice(data).unwrap();
 
-        let result = super::matrix_to_value(matrix, false, Span::unknown());
+        let result = super::matrix_to_value(matrix, false, Span::unknown(), &Signals::empty());
 
         let record = result
             .into_value(Span::unknown())
@@ -217,7 +227,7 @@ mod test {
         let data = r#"[{"metric":{"__name__":"up","instance":"target.example","job":"job name"},"value":[1716956024.754,"1"]}]"#.as_bytes();
         let vector: Vec<InstantVector> = serde_json::from_slice(data).unwrap();
 
-        let result = super::vector_to_value(vector, false, Span::unknown())
+        let result = super::vector_to_value(vector, false, Span::unknown(), &Signals::empty())
             .into_value(Span::unknown())
             .unwrap()
             .into_list()

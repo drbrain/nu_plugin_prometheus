@@ -103,7 +103,7 @@ impl PluginCommand for QueryRangeCommand {
 
         query_builder
             .range(start, end, step, &query, query_span, call_span)
-            .run()
+            .run(engine.signals())
             .map(|pipeline| {
                 let metadata = PipelineMetadata::default()
                     .with_table_width_priority_columns(call_span, ["name"]);

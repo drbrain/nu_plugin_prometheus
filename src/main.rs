@@ -1,6 +1,7 @@
 mod client;
 mod prometheus;
 mod query;
+mod signals;
 mod source;
 
 use client::Client;
