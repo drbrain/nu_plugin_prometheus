@@ -1,5 +1,6 @@
 use crate::{
     Client,
+    client::labeled_error,
     query::{matrix_to_value, scalar_to_value, vector_to_value},
     signals::run_with_signal,
 };
@@ -39,7 +40,7 @@ impl QueryInstant {
         self.runtime()?.block_on(async {
             let response = run_with_signal(signals, call_span, query.clone().get())
                 .await?
-                .map_err(|error| self.labeled_error(error, query_span))?;
+                .map_err(|error| labeled_error(error, query_span))?;
 
             let data = match response.into_inner().0 {
                 Data::Vector(v) => vector_to_value(v, flatten, call_span, signals),
