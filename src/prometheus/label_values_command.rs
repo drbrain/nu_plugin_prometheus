@@ -1,15 +1,15 @@
 use crate::{
+    Prometheus,
     client::{LabelValues, LabelValuesBuilder},
     source::Source,
-    Prometheus,
 };
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type};
 
 #[derive(Clone, Default)]
 pub struct LabelValuesCommand;
 
-impl SimplePluginCommand for LabelValuesCommand {
+impl PluginCommand for LabelValuesCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -64,9 +64,13 @@ impl SimplePluginCommand for LabelValuesCommand {
         _plugin: &Self::Plugin,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        label: &Value,
-    ) -> Result<Value, LabeledError> {
-        let span = label.span();
+        input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let call_span = call.head;
+
+        let label = input.into_value(call_span)?;
+        let label_span = label.span();
+
         let source = Source::from(call, engine)?;
 
         let builder = LabelValuesBuilder::new(source.try_into()?);
@@ -75,6 +79,11 @@ impl SimplePluginCommand for LabelValuesCommand {
         let end = call.get_flag("end")?;
         let selectors = call.rest(0)?;
 
-        LabelValues::new(builder.values(label, start, end, &selectors)?, span).run()
+        LabelValues::new(
+            builder.values(&label, start, end, &selectors)?,
+            label_span,
+            call_span,
+        )
+        .run()
     }
 }

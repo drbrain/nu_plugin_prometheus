@@ -5,15 +5,15 @@ use nu_protocol::{
 use prometheus_http_query::LabelNamesQueryBuilder;
 
 pub struct LabelNames {
-    selectors: LabelNamesQueryBuilder,
+    query: LabelNamesQueryBuilder,
     selectors_span: Span,
     call_span: Span,
 }
 
 impl LabelNames {
-    pub fn new(selectors: LabelNamesQueryBuilder, selectors_span: Span, call_span: Span) -> Self {
+    pub fn new(query: LabelNamesQueryBuilder, selectors_span: Span, call_span: Span) -> Self {
         Self {
-            selectors,
+            query,
             selectors_span,
             call_span,
         }
@@ -23,7 +23,7 @@ impl LabelNames {
         let runtime = self.runtime()?;
 
         let Self {
-            selectors: query,
+            query,
             selectors_span: query_span,
             call_span,
         } = self;
