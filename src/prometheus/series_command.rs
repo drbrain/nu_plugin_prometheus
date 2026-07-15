@@ -1,16 +1,16 @@
 use crate::{
-    client::{SelectorParser, Series},
     Prometheus, Source,
+    client::{SelectorParser, Series},
 };
 use chrono::{DateTime, FixedOffset};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, Signature, SyntaxShape, Type, Value};
 use prometheus_http_query::Client;
 
 #[derive(Clone, Default)]
 pub struct SeriesCommand;
 
-impl SimplePluginCommand for SeriesCommand {
+impl PluginCommand for SeriesCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -52,18 +52,21 @@ impl SimplePluginCommand for SeriesCommand {
         _plugin: &Self::Plugin,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        selectors: &Value,
-    ) -> Result<Value, LabeledError> {
-        let span = selectors.span();
+        input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let call_span = call.head;
+
+        let selectors = input.into_value(call_span)?;
+        let selectors_span = selectors.span();
 
         let client: Client = Source::from(call, engine)?.try_into()?;
 
         let mut builder = match selectors {
-            Value::String { .. } => client.series(vec![SelectorParser::parse(selectors)?]),
+            Value::String { .. } => client.series(vec![SelectorParser::parse(&selectors)?]),
             Value::List { vals: values, .. } => {
                 let mut selectors = vec![];
 
-                for selector in values {
+                for selector in &values {
                     selectors.push(SelectorParser::parse(selector)?);
                 }
 
@@ -71,7 +74,7 @@ impl SimplePluginCommand for SeriesCommand {
             }
             _ => {
                 return Err(LabeledError::new("Invalid input type")
-                    .with_label("must be Nothing, String or list of Strings", span));
+                    .with_label("must be Nothing, String or list of Strings", selectors_span));
             }
         }
         .map_err(|e| LabeledError::new("Series query error").with_help(e.to_string()))?;
@@ -84,6 +87,6 @@ impl SimplePluginCommand for SeriesCommand {
             builder = builder.end(end.timestamp());
         }
 
-        Series::new(builder, span).run()
+        Series::new(builder, selectors_span).run(engine.signals(), call_span)
     }
 }
