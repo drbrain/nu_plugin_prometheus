@@ -1,5 +1,9 @@
-use nu_protocol::{record, LabeledError, Span, Value};
+use nu_protocol::{
+    IntoInterruptiblePipelineData, LabeledError, PipelineData, Signals, Span, Value, record,
+};
 use prometheus_http_query::MetricMetadataQueryBuilder;
+
+use crate::{client::labeled_error, signals::run_with_signal};
 
 use super::Client;
 
@@ -13,36 +17,44 @@ impl MetricMetadata {
         Self { builder, span }
     }
 
-    pub fn run(self) -> Result<Value, LabeledError> {
-        let Self { ref builder, span } = self;
+    pub fn run(self, signals: &Signals, call_span: Span) -> Result<PipelineData, LabeledError> {
+        let Self {
+            ref builder,
+            span: metric_span,
+        } = self;
 
         self.runtime()?.block_on(async {
-            let metric_metadata = builder
-                .clone()
-                .get()
-                .await
-                .map_err(|error| self.labeled_error(error, span))?;
+            let metric_metadata = run_with_signal(signals, call_span, builder.clone().get())
+                .await?
+                .map_err(|error| labeled_error(error, metric_span))?;
 
-            let record = metric_metadata
-                .iter()
-                .fold(record!(), |mut record, (metric, metadata)| {
-                    let metadata: Vec<_> =
-                    metadata.iter().map(|item| {
-                        let item = record! {
-                            "type" => Value::string(item.metric_type().to_string(), Span::unknown()),
-                            "help" => Value::string(item.help().to_string(), Span::unknown()),
-                            "unit" => Value::string(item.unit().to_string(), Span::unknown()),
-                        };
+            let pipeline = metric_metadata
+                .into_iter()
+                .map(move |(metric, metadata)| {
+                    let metadata: Vec<_> = metadata
+                        .iter()
+                        .map(|item| {
+                            let item = record! {
+                                "type" => Value::string(item.metric_type().to_string(), call_span),
+                                "help" => Value::string(item.help().to_string(), call_span),
+                                "unit" => Value::string(item.unit().to_string(), call_span),
+                            };
 
-                        Value::record(item, Span::unknown())
-                    }).collect();
+                            Value::record(item, call_span)
+                        })
+                        .collect();
 
-                    record.insert(metric, Value::list(metadata, Span::unknown()));
+                    Value::record(
+                        record! {
+                            "name" => Value::string(metric, call_span),
+                            "metadata" => Value::list(metadata, call_span),
+                        },
+                        call_span,
+                    )
+                })
+                .into_pipeline_data(call_span, signals.clone());
 
-                    record
-                });
-
-            Ok(Value::record(record, Span::unknown()))
+            Ok(pipeline)
         })
     }
 }

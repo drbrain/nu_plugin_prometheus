@@ -1,12 +1,12 @@
-use crate::{client::MetricMetadata, Prometheus, Source};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, SyntaxShape, Type, Value};
+use crate::{Prometheus, Source, client::MetricMetadata};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, Signature, Span, SyntaxShape, Type};
 use prometheus_http_query::Client;
 
 #[derive(Clone, Default)]
 pub struct MetricMetadataCommand;
 
-impl SimplePluginCommand for MetricMetadataCommand {
+impl PluginCommand for MetricMetadataCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -55,16 +55,20 @@ impl SimplePluginCommand for MetricMetadataCommand {
         _plugin: &Self::Plugin,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        metric: &Value,
-    ) -> Result<Value, LabeledError> {
-        let span = metric.span();
+        input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let call_span = call.head;
 
         let client: Client = Source::from(call, engine)?.try_into()?;
 
         let mut builder = client.metric_metadata();
 
-        if let Value::String { val: metric, .. } = metric {
+        let metric_span = if !input.is_nothing() {
+            let (metric, metric_span, _) = input.collect_string_strict(call_span)?;
             builder = builder.metric(metric);
+            metric_span
+        } else {
+            Span::unknown()
         };
 
         if let Some(limit) = call.get_flag::<i64>("limit")? {
@@ -88,6 +92,6 @@ impl SimplePluginCommand for MetricMetadataCommand {
             builder = builder.limit_per_metric(limit_per_metric);
         }
 
-        MetricMetadata::new(builder, span).run()
+        MetricMetadata::new(builder, metric_span).run(engine.signals(), call_span)
     }
 }
