@@ -9,13 +9,13 @@ use tokio::{
 
 const CHECK_INTERVAL: Duration = Duration::from_millis(10);
 
-pub async fn run_with_signal<F, T>(
+pub async fn run_with_signal<'a, F, T>(
     signals: &Signals,
     call_span: Span,
     future: F,
 ) -> Result<T, LabeledError>
 where
-    F: Future<Output = T> + 'static,
+    F: Future<Output = T> + 'a,
 {
     let (interrupted, task) = signal_wait_channel(signals);
 

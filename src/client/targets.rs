@@ -1,36 +1,33 @@
-use crate::Client;
+use crate::{Client, client::labeled_error, signals::run_with_signal};
 use chrono::DateTime;
-use nu_protocol::{record, LabeledError, Span, Value};
+use nu_protocol::{
+    IntoInterruptiblePipelineData, LabeledError, PipelineData, Signals, Span, Value, record,
+};
 use prometheus_http_query::{
-    response::{ActiveTarget, DroppedTarget},
     TargetState,
+    response::{ActiveTarget, DroppedTarget},
 };
 use std::collections::HashMap;
 
 pub struct Targets {
     client: prometheus_http_query::Client,
-    span: Span,
     target_state: Option<TargetState>,
 }
 
 impl Targets {
-    pub fn new(
-        client: prometheus_http_query::Client,
-        span: Span,
-        target_state: Option<TargetState>,
-    ) -> Self {
+    pub fn new(client: prometheus_http_query::Client, target_state: Option<TargetState>) -> Self {
         Self {
             client,
-            span,
             target_state,
         }
     }
 
-    pub fn run(self) -> Result<Value, LabeledError> {
+    pub fn run(self, signals: &Signals, span: Span) -> Result<PipelineData, LabeledError> {
+        let runtime = self.runtime()?;
+
         let Self {
-            ref client,
-            span,
-            ref target_state,
+            client,
+            target_state,
         } = self;
 
         // NOTE: Doesn't impl Clone
@@ -49,22 +46,30 @@ impl Targets {
             None => None,
         };
 
-        self.runtime()?.block_on(async {
-            let targets = client
-                .targets(target_state)
-                .await
-                .map_err(|error| self.labeled_error(error, span))?;
+        runtime.block_on(async {
+            let targets = run_with_signal(signals, span, client.targets(target_state))
+                .await?
+                .map_err(|error| labeled_error(error, span))?;
 
             let value = match target_state2 {
-                Some(TargetState::Active) => active(targets.active()),
-                Some(TargetState::Dropped) => dropped(targets.dropped()),
+                Some(TargetState::Active) => active(targets.active().to_vec(), span)
+                    .into_pipeline_data(span, signals.clone()),
+                Some(TargetState::Dropped) => dropped(targets.dropped().to_vec(), span)
+                    .into_pipeline_data(span, signals.clone()),
                 Some(TargetState::Any) | None => {
+                    let active = active(targets.active().to_vec(), span)
+                        .into_pipeline_data(span, signals.clone())
+                        .into_value(span)?;
+                    let dropped = dropped(targets.dropped().to_vec(), span)
+                        .into_pipeline_data(span, signals.clone())
+                        .into_value(span)?;
+
                     let record = record! {
-                        "active" => active(targets.active()),
-                        "dropped" => dropped(targets.dropped()),
+                        "active" => active,
+                        "dropped" => dropped,
                     };
 
-                    Value::record(record, span)
+                    PipelineData::value(Value::record(record, span), None)
                 }
             };
 
@@ -75,64 +80,56 @@ impl Targets {
 
 impl Client for Targets {}
 
-fn active(active: &[ActiveTarget]) -> Value {
-    let active: Vec<_> = active
-        .iter()
-        .map(|target| {
+fn active(active: Vec<ActiveTarget>, span: Span) -> impl IntoInterruptiblePipelineData {
+    active
+        .into_iter()
+        .map(move |target| {
             let record = record! {
-                "discovered_labels" => hashmap_to_record(target.discovered_labels()),
-                "global_url" => Value::string(target.global_url().as_str(), Span::unknown()),
-                "health" => Value::string(target.health().to_string(), Span::unknown()),
-                "labels" => hashmap_to_record(target.labels()),
-                "last_error" => Value::string(target.last_error(), Span::unknown()),
+                "discovered_labels" => hashmap_to_record(target.discovered_labels(), span),
+                "global_url" => Value::string(target.global_url().as_str(), span),
+                "health" => Value::string(target.health().to_string(), span),
+                "labels" => hashmap_to_record(target.labels(), span),
+                "last_error" => Value::string(target.last_error(), span),
                 "last_scrape" => Value::date(
                     DateTime::from_timestamp(
                         target.last_scrape().unix_timestamp(),
                         target.last_scrape().nanosecond()).expect("invalid timestamp").fixed_offset(),
-                    Span::unknown()
+                    span
                 ),
-                "last_scrape_duration" => Value::duration((target.last_scrape_duration() * 1_000_000_000.0) as i64, Span::unknown()),
-                "scrape_interval" => Value::duration(target.scrape_interval().whole_seconds() * 1_000_000_000, Span::unknown()),
-                "scrape_pool" => Value::string(target.scrape_pool(), Span::unknown()),
-                "scrape_timeout" => Value::duration(target.scrape_timeout().whole_seconds() * 1_000_000_000, Span::unknown()),
-                "scrape_url" => Value::string(target.scrape_url().as_str(), Span::unknown()),
+                "last_scrape_duration" => Value::duration((target.last_scrape_duration() * 1_000_000_000.0) as i64, span),
+                "scrape_interval" => Value::duration(target.scrape_interval().whole_seconds() * 1_000_000_000, span),
+                "scrape_pool" => Value::string(target.scrape_pool(), span),
+                "scrape_timeout" => Value::duration(target.scrape_timeout().whole_seconds() * 1_000_000_000, span),
+                "scrape_url" => Value::string(target.scrape_url().as_str(), span),
             };
 
-            Value::record(record, Span::unknown())
+            Value::record(record, span)
         })
-        .collect();
-
-    Value::list(active, Span::unknown())
 }
 
-fn dropped(dropped: &[DroppedTarget]) -> Value {
-    let dropped: Vec<_> = dropped
-        .iter()
-        .map(|target| {
-            let record = record! {
-                "discovered_labels" => hashmap_to_record(target.discovered_labels()),
-            };
+fn dropped(dropped: Vec<DroppedTarget>, span: Span) -> impl IntoInterruptiblePipelineData {
+    dropped.into_iter().map(move |target| {
+        let record = record! {
+            "discovered_labels" => hashmap_to_record(target.discovered_labels(), span),
+        };
 
-            Value::record(record, Span::unknown())
-        })
-        .collect();
-
-    Value::list(dropped, Span::unknown())
+        Value::record(record, span)
+    })
 }
 
-fn hashmap_to_record(labels: &HashMap<String, String>) -> Value {
+fn hashmap_to_record(labels: &HashMap<String, String>, span: Span) -> Value {
     let mut record = record! {};
 
     for (name, label) in labels {
-        record.push(name, Value::string(label, Span::unknown()));
+        record.push(name, Value::string(label, span));
     }
 
-    Value::record(record, Span::unknown())
+    Value::record(record, span)
 }
 
 #[cfg(test)]
 mod test {
-    use nu_protocol::{Span, Value};
+    use nu_protocol::{IntoInterruptiblePipelineData, Signals, Span, Value};
     use prometheus_http_query::response::{ActiveTarget, DroppedTarget};
 
     #[test]
@@ -163,10 +160,12 @@ mod test {
         .as_bytes();
         let active: Vec<ActiveTarget> = serde_json::from_slice(data).unwrap();
 
-        let result = super::active(&active);
+        let result = super::active(active, Span::unknown())
+            .into_pipeline_data(Span::unknown(), Signals::empty())
+            .into_value(Span::unknown())
+            .unwrap();
 
         let record = result
-            .clone()
             .into_list()
             .unwrap()
             .first()
@@ -239,12 +238,15 @@ mod test {
           }
         ]"#
         .as_bytes();
+
         let dropped: Vec<DroppedTarget> = serde_json::from_slice(data).unwrap();
 
-        let result = super::dropped(&dropped);
+        let result = super::dropped(dropped, Span::unknown())
+            .into_pipeline_data(Span::unknown(), Signals::empty())
+            .into_value(Span::unknown())
+            .unwrap();
 
         let record = result
-            .clone()
             .into_list()
             .unwrap()
             .first()
