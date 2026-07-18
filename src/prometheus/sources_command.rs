@@ -1,11 +1,11 @@
-use crate::{source::Source, Prometheus};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, Type, Value};
+use crate::{Prometheus, source::Source};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{IntoPipelineData, LabeledError, PipelineData, Signature, Type};
 
 #[derive(Clone, Default)]
 pub struct SourcesCommand;
 
-impl SimplePluginCommand for SourcesCommand {
+impl PluginCommand for SourcesCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -27,16 +27,25 @@ impl SimplePluginCommand for SourcesCommand {
         _plugin: &Prometheus,
         engine: &EngineInterface,
         _call: &EvaluatedCall,
-        _input: &Value,
-    ) -> Result<Value, LabeledError> {
-        // validate
+        _input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        // validate only, format is different from config
         Source::list(engine)?;
 
-        Ok(engine
-            .get_plugin_config()
-            .expect("already validated by Source::list()")
-            .unwrap()
+        let sources = engine
+            .get_plugin_config()?
+            .ok_or_else(|| {
+                // unreachable, Sources::list already validated
+                LabeledError::new("prometheus plugin config missing")
+            })?
             .get_data_by_key("sources")
-            .unwrap())
+            .ok_or_else(|| {
+                LabeledError::new("No sources defined")
+                    .with_help("Use `config nu` to define prometheus sources")
+                    .with_url("https://github.com/drbrain/nu_plugin_prometheus#sources")
+            })?
+            .into_pipeline_data();
+
+        Ok(sources)
     }
 }
