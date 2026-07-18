@@ -1,11 +1,11 @@
 use crate::Prometheus;
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{LabeledError, Signature, Span, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{LabeledError, PipelineData, Signature, Type};
 
 #[derive(Clone, Default)]
 pub struct LabelCommand;
 
-impl SimplePluginCommand for LabelCommand {
+impl PluginCommand for LabelCommand {
     type Plugin = Prometheus;
 
     fn name(&self) -> &str {
@@ -16,7 +16,7 @@ impl SimplePluginCommand for LabelCommand {
         Signature::build(self.name()).input_output_type(Type::Nothing, Type::Nothing)
     }
 
-    fn usage(&self) -> &str {
+    fn description(&self) -> &str {
         "Prometheus label names and values"
     }
 
@@ -25,10 +25,10 @@ impl SimplePluginCommand for LabelCommand {
         _plugin: &Self::Plugin,
         engine: &EngineInterface,
         _call: &EvaluatedCall,
-        _input: &Value,
-    ) -> Result<Value, LabeledError> {
+        _input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
         eprintln!("{}", engine.get_help()?);
 
-        Ok(Value::nothing(Span::unknown()))
+        Ok(PipelineData::Empty)
     }
 }
