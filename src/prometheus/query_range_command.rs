@@ -36,7 +36,7 @@ impl PluginCommand for QueryRangeCommand {
                 "Query resolution step width",
                 None,
             )
-            .named("timeout", SyntaxShape::Number, "Evaluation timeout", None)
+            .named("timeout", SyntaxShape::Duration, "Evaluation timeout", None)
             .named(
                 "source",
                 SyntaxShape::String,

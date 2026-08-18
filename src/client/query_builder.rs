@@ -22,8 +22,14 @@ impl QueryBuilder {
         self.flatten = true;
     }
 
-    pub fn timeout(&mut self, timeout: i64) {
-        self.timeout = Some(timeout);
+    pub fn timeout(&mut self, timeout_ns: i64) {
+        let timeout_ms = if timeout_ns < 1_000_000 {
+            1
+        } else {
+            timeout_ns / 1_000_000
+        };
+
+        self.timeout = Some(timeout_ms);
     }
 
     pub fn instant(

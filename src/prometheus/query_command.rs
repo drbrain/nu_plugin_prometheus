@@ -24,7 +24,7 @@ impl PluginCommand for QueryCommand {
                 "Evaluation timestamp for an instant query",
                 None,
             )
-            .named("timeout", SyntaxShape::Number, "Evaluation timeout", None)
+            .named("timeout", SyntaxShape::Duration, "Evaluation timeout", None)
             .named(
                 "source",
                 SyntaxShape::String,
